@@ -18,6 +18,7 @@ import {
   zGetMyUsageResponse,
   zListEndpointsResponse,
   zListInvitationsResponse,
+  zListProjectsResponse,
   zListRefusalsResponse,
   zListRunsResponse,
   zListUsersResponse,
@@ -59,6 +60,8 @@ interface State {
   /** Everyone's, newest first: what /v1/admin/runs lists. */
   adminRuns: AdminRun[];
   refusals: Refusal[];
+  /** Set by /__break-projects: /v1/projects answers 500. */
+  projectsBroken: boolean;
   /** Session renewals the browser asked for (through the edge), counted for the session test. */
   renewals: number;
 }
@@ -115,7 +118,7 @@ function fresh(): State {
     { id: randomUUID(), repo: "open-macaron/sandbox", number: 11, kind: "issue", author: "defunkt", authorId: 2, url: "https://github.com/open-macaron/sandbox/issues/11#issuecomment-1", reason: "@defunkt may not ask for implement: an admin grants it on the Users page", createdAt: at(-0.2) },
     { id: randomUUID(), repo: "open-macaron/macaron", number: 12, kind: "pull", author: "octocat", authorId: 583231, url: "https://github.com/open-macaron/macaron/pull/12#issuecomment-2", reason: null, createdAt: at(-3) },
   ];
-  return { users, invitations, endpoints, keys: new Map(), keyEvents: new Map(), caps: new Map(), runs, adminRuns, refusals, renewals: 0 };
+  return { users, invitations, endpoints, keys: new Map(), keyEvents: new Map(), caps: new Map(), runs, adminRuns, refusals, projectsBroken: false, renewals: 0 };
 }
 
 let state = fresh();
@@ -153,6 +156,10 @@ async function route(request: IncomingMessage): Promise<Reply> {
     state = fresh();
     return reply(200, undefined, { reset: true });
   }
+  if (method === "POST" && url.pathname === "/__break-projects") {
+    state.projectsBroken = true;
+    return reply(200, undefined, { broken: true });
+  }
   if (url.pathname === "/__renewals") return reply(200, undefined, { renewals: state.renewals });
 
   const user = signedIn(request);
@@ -175,6 +182,21 @@ async function route(request: IncomingMessage): Promise<Reply> {
   if (user === undefined) return reply(401, undefined, { error: "sign_in_required" });
   if (url.pathname === "/v1/me") {
     return reply(200, zGetMeResponse, { githubId: user.githubId, githubLogin: user.githubLogin, name: user.name, avatarUrl: user.avatarUrl, role: user.role, capabilities: user.capabilities });
+  }
+  if (url.pathname === "/v1/projects") {
+    if (state.projectsBroken) return reply(500, undefined, { error: "internal" });
+    return reply(200, zListProjectsResponse, {
+      projects: [
+        { name: "empty-project", repos: [] },
+        {
+          name: "sandbox",
+          repos: [
+            { repo: "open-macaron/sandbox-a", fork: "macaron-bot/x1y2z3-sandbox-a" },
+            { repo: "open-macaron/sandbox-b", fork: null },
+          ],
+        },
+      ],
+    });
   }
   if (url.pathname === "/v1/me/usage") {
     const limit = Number(url.searchParams.get("limit") ?? "25");
