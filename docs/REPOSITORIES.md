@@ -30,7 +30,7 @@ The org [`open-macaron`](https://github.com/open-macaron) owns all of our reposi
 | Repo | Contents | Who writes | Why separate |
 |---|---|---|---|
 | `open-macaron/macaron` (this repo) | `packages/controller`, `packages/{contracts,agent-cli,review,owners,knowledge-cli,config-cli}`, `deploy/`, `docs/` | Humans via PR | Source of truth for code. Releases through changesets; the controller rolls out from its ImageStream |
-| `open-macaron/config` | `global.yaml`, `projects/<p>/project.yaml`, `projects/<p>/repos/<r>.yaml`, each project folder with `OWNERS.yaml` | Humans via PR, from forks. Project owners approve (no write access needed); `merge.yml` merges; the platform team merges `global.yaml` and reserved settings (users, budgets, runners) by hand | Trust config changes on its own cadence and goes live without a deploy: Pages publishes a snapshot the controller reloads on the deployment's webhook (DEPLOYMENT.md §6) |
+| `open-macaron/config` | `global.yaml`, `projects/<p>/project.yaml`, `projects/<p>/repos/<r>.yaml`, each project folder with `OWNERS.yaml` | Humans via PR, from forks. Project owners approve (no write access needed); `merge.yml` merges; the platform team merges `global.yaml` and reserved settings (budgets, runners) by hand | Trust config changes on its own cadence and goes live without a deploy: Pages publishes a snapshot the controller reloads on the deployment's webhook (DEPLOYMENT.md §6) |
 | `open-macaron/runner` | `.github/workflows/run.yml` (the only workflow), `environments/` (shared: `generic`, `podman-desktop`, `podman-desktop-extensions`; own environments would go in `repos/<o>/<r>/`), plus a `README` describing the contract (SCALING.md §1) | Humans via PR; the bot only *dispatches* | Gives agent runs their own `repository_id` (the OIDC check pins it) and their own public run history. The token that dispatches runs can't trigger `macaron`'s `release.yml` |
 | `open-macaron/knowledge` | `global/`, `projects/<p>/`, `repos/<owner>/<repo>/`, each with `OWNERS.yaml`, `rules/`, `lessons/` (DESIGN.md §6) | Humans write rules; the bot proposes lessons from its fork. Folder owners approve (no write access needed); `merge.yml` merges | High-churn, bot-authored content stays out of the code repo. Knowledge is versioned independently of controller releases |
 | `open-macaron/.github` | `LICENSE` and `README.md` today; the org profile and default community health files (SECURITY.md, CONTRIBUTING.md) belong here | Humans | GitHub convention |
@@ -51,7 +51,7 @@ How `run.yml` gets the agent-cli:
 
 | Token (in the controller's Secret) | Type and owner | Permissions | Used for |
 |---|---|---|---|
-| `GH_INTERACT` | classic PAT of macaron-bot | `repo`, `notifications` | Comments, reactions, PRs and notifications on **upstream** repos. The org blocks classic PATs, so this token can't touch `open-macaron/*` |
+| `GH_INTERACT` | classic PAT of macaron-bot | `repo`, `notifications` | Comments, reactions, PRs and notifications on **upstream** repos. Creating and configuring the bot's forks (§5). The org blocks classic PATs, so this token can't touch `open-macaron/*` |
 | `GH_PUSH` | fine-grained, owner `macaron-bot`, all repositories | Contents: write. Workflows: write | `git push` to forks (macaron-bot owns nothing else but its profile repository), including `macaron-bot/knowledge`, and media uploads (user-attachments) against the fork (`EvidenceHost`). Workflows only carries upstream's own workflow commits when a fork is synced or branched; the controller never writes `.github/` itself. No Administration permission. **Never enable Actions on a fork**: onboarding disables them explicitly (§5) |
 | `GH_ORG` | fine-grained, owner `open-macaron`, repositories `runner`, `knowledge` and `config`, approved by an org owner | `runner`: Actions read and write. `knowledge` and `config`: Pull requests read and write | Start and cancel runs; open and update the `remember:` proposals from `macaron-bot/knowledge`; comment on the `config` pull request that onboarded a repository (§5). The org blocks the classic `GH_INTERACT`. Artifacts use `GH_INTERACT` (public reads). A GitHub App could replace this token later, to avoid manual renewal |
 
@@ -104,7 +104,9 @@ flowchart TD
 - **Fork networks:** GitHub allows one fork per network, so upstreams of one network (an upstream and a test fork of it) share the bot's fork.
 - **Optional:** a PR to knowledge, `repos/org-x/repo-a/overview.md`.
 
-A `fork:` key left in a repository file is accepted and ignored; open-macaron/config drops them.
+A `fork:` key in a repository file is accepted and ignored; open-macaron/config dropped them on 2026-11-02.
+
+`macaron-bot/knowledge` is the exception: it isn't in the configuration, so `ForkRegistry` doesn't manage it. It stays a hand-made fork with Actions disabled, used only for `remember:` proposals.
 
 ## 6. Bootstrap checklist
 

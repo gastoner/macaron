@@ -119,7 +119,7 @@ Once it exists, a red env-check would pause the repo: the controller would answe
    CI (check): the controller's validation ✓  OWNERS.yaml ✓  reserved settings flagged
    review: the folder's OWNERS.yaml owners; the platform team merges by hand reserved settings and new project folders
  merge → Pages publishes → controller reloads (deployment_status) → live
- (beforehand, a maintainer creates the fork with Actions off: REPOSITORIES.md §5)
+ controller forks, Actions off, comments on the PR: REPOSITORIES.md §5
 ```
 
 The platform team only reviews money and trust. Everything else is owned by the project.

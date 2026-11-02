@@ -12,9 +12,9 @@ export type GitHub = InstanceType<typeof MacaronOctokit>;
  * Capability-scoped clients (ENGINEERING.md §4). Each token is its own injection token, and
  * lint rules restrict which modules may inject which.
  */
-export const GH_INTERACT = Symbol("GH_INTERACT"); // comments, reactions, PRs, notifications; reads public repos (artifacts)
+export const GH_INTERACT = Symbol("GH_INTERACT"); // comments, reactions, PRs, notifications; reads public repos (artifacts); creates and configures the bot's forks
 export const GH_PUSH = Symbol("GH_PUSH"); // git data writes on the bot's forks only
-export const GH_ORG = Symbol("GH_ORG"); // open-macaron/runner: start and cancel workflow runs; open-macaron/knowledge: proposal PRs
+export const GH_ORG = Symbol("GH_ORG"); // open-macaron/runner: start and cancel workflow runs; open-macaron/knowledge: proposal PRs; open-macaron/config: onboarding comments
 
 /** Endpoints whose retries we control ourselves (X-Poll-Interval must win over any auto-retry). */
 const SELF_PACED = /\/notifications(\/|$|\?)/;

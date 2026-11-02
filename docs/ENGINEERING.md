@@ -50,7 +50,7 @@ flowchart LR
   HTTP["HttpModule<br/>Bootstrap, Webhook, Health controllers"] --> RUNS
   ING["IngestModule<br/>NotificationsPoller, IngestService,<br/>ThreadWorker, ContextBuilder, ThreadStates"] --> RUNS
   RUNS["RunsModule<br/>RunLauncher, OidcVerifier,<br/>ArtifactDownloader, Housekeeping"] --> BUD["BudgetModule<br/>RunKeysRegistry (BifrostKeys, OpenRouterKeys),<br/>BudgetService"]
-  RUNS --> PUB["PublishModule<br/>Publisher, ForkCommitter, UpstreamWriter,<br/>ReactionTargets, EvidenceHost, KnowledgeProposer"]
+  RUNS --> PUB["PublishModule<br/>Publisher, ForkCommitter, UpstreamWriter,<br/>ReactionTargets, EvidenceHost, KnowledgeProposer,<br/>ForkRegistry, OnboardingNotice"]
   RUNS --> REV["ReviewModule<br/>KnowledgeClient, PullDiffReader"]
   ING --> PUB
   ING --> REV
@@ -60,7 +60,7 @@ flowchart LR
 
 - **Routing is plain code, not a module.** `src/routing/routes.ts` (`ROUTES`, `route()`, subjects) is pure and table-tested; `ThreadStates` reads what it needs from GitHub and the ledger, and `ThreadWorker` applies it (DESIGN.md §4 "Subjects and routes").
 - **Dependencies point one way:** HTTP and ingest → runs → budget, publish, review. Each module exports only what its users need. Nothing enforces the direction automatically yet; reviews do.
-- **State lives in Postgres, not in memory.** Background work runs on [pg-boss](https://github.com/timgit/pg-boss), on the same database: per-thread debounce (`upsert` on a `stately` queue moves the pending job back), deduplicated `run-completed` jobs, and cron-scheduled `reconcile` and `sweep-keys`. The notifications poller is itself a pg-boss job (see DESIGN.md §4), so a restart loses nothing.
+- **State lives in Postgres, not in memory.** Background work runs on [pg-boss](https://github.com/timgit/pg-boss), on the same database: per-thread debounce (`upsert` on a `stately` queue moves the pending job back), deduplicated `run-completed` and `ensure-fork` jobs, and cron-scheduled `reconcile` and `sweep-keys`. The notifications poller is itself a pg-boss job (see DESIGN.md §4), so a restart loses nothing.
 - **Idempotency.** Every external effect (reaction, comment, push, dispatch) is keyed in the database by `(thread, loop, effect)`. A retried job never double-posts.
 
 Drizzle tables (`packages/controller/src/db/schema.ts`):
@@ -68,6 +68,7 @@ Drizzle tables (`packages/controller/src/db/schema.ts`):
 ```ts
 export const pollState       = pgTable("poll_state",       { /* singleton: Last-Modified, interval, notBefore — the poller's pacing */ });
 export const configSnapshots = pgTable("config_snapshots", { /* commit, files — each published configuration applied, the boot fallback */ });
+export const forks           = pgTable("forks",            { /* upstreamId, upstreamKey, forkId, forkName, readyAt — the bot's fork of each upstream, picked by the controller */ });
 export const threads    = pgTable("threads",    { /* repo, number, kind, branch, prNumber, cursor, loops, spentUsd */ });
 export const events     = pgTable("events",     { /* threadId, sourceId, author, kind, dueAt, claimedAt, status, refusal */ });
 export const runs       = pgTable("runs",       { /* ticket, threadId, mode, ghRunId, keyHash, limitUsd, costUsd, status */ });
@@ -87,8 +88,8 @@ Migrations are generated with `drizzle-kit generate` and committed. They run at 
 Least privilege also applies inside the codebase. Each token has its own injection token, and only the modules listed below inject it (checked in review; no lint rule enforces it yet):
 
 ```ts
-export const GH_INTERACT = Symbol("GH_INTERACT"); // comments, reactions, PRs, notifications — Ingest, Publish
-export const GH_ORG      = Symbol("GH_ORG");      // runner: dispatch/cancel/artifacts; knowledge: PR — Runs, Publish
+export const GH_INTERACT = Symbol("GH_INTERACT"); // comments, reactions, PRs, notifications; creates the bot's forks — Ingest, Publish
+export const GH_ORG      = Symbol("GH_ORG");      // runner: dispatch/cancel/artifacts; knowledge: PR; config: onboarding comments — Runs, Publish
 export const GH_PUSH     = Symbol("GH_PUSH");     // git push to forks — Publish only
 
 @Injectable()

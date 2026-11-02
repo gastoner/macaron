@@ -73,7 +73,7 @@ A new `Mode` also needs a migration (`run_mode` enum) and entries in every `Reco
 ## Security invariants (never weaken; see DESIGN.md §3, §7)
 
 - **Runners never hold a GitHub token.** Everything public (comments, PRs, reviews, media uploads) is written by the controller, after the **Gate**.
-- **The bot never has write access upstream:** it works from its forks. Uploads that need write access target the fork.
+- **The bot never has write access upstream:** it works from its forks. Uploads that need write access target the fork. A configuration can't name a fork: `ForkRegistry` picks, creates and records it, and accepts one only if the bot owns it and it belongs to the upstream's fork network, by repository id.
 - **Agent output is untrusted:** results are schema-validated and gated; review violations stand only with a quote of an added line; mentions are defused (`sanitize()`).
 - **Read-only sessions** (reviews) get `--permission-mode dontAsk`, a short tool list, and never MCP servers. They're defined once, in `packages/review` (`claudeReviewArgs`), for the bot and the local CLI alike.
 - **Users sign in with GitHub only, by invitation.** GitHub's OAuth tokens are never stored, no IP address is kept, session cookies are `__Secure-`, httpOnly and SameSite=Lax. `/v1/me` and `/v1/admin` are reached only by the web app through the cluster Service, never through the edge, and every handler resolves the session itself (`SessionsService`); admin handlers check the role first.
@@ -98,6 +98,7 @@ A new `Mode` also needs a migration (`run_mode` enum) and entries in every `Reco
 
 ## Pitfalls already met
 
+- GitHub allows one fork per fork network: forking an upstream the bot already forked answers the existing fork, under its own name and not the one requested. Upstreams of one network share a fork.
 - better-auth drops every `input: false` user field coming from a provider's profile (`mapProfileToUser`): the GitHub id and login are read from the raw profile in `validateUserInfo` and written when the account is linked (`accounts/auth.ts`). Never make them `input: true`: users could set them through `/api/auth/update-user`.
 - better-auth's default rate limit allows a few sign-ins per address every 10 seconds: tests sign in from distinct `X-Client-Address` values.
 - A remote form submitted to a local production build (`node build`) over plain http is refused as cross-site: adapter-node assumes https. Run it with `PROTOCOL_HEADER=x-forwarded-proto` and send that header, as the edge does.
