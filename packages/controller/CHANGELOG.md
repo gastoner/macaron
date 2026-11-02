@@ -1,5 +1,17 @@
 # @open-macaron/controller
 
+## 0.9.0
+
+### Minor Changes
+
+- 9ca6995: The projects move from the Overview page to a Projects page in the menu. `GET /v1/projects` now serves pages of rows (`limit`, `after`), loaded 25 at a time.
+
+### Patch Changes
+
+- Updated dependencies [9ca6995]
+  - @open-macaron/contracts@0.10.0
+  - @open-macaron/review@0.3.10
+
 ## 0.8.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @open-macaron/web
 
+## 0.6.0
+
+### Minor Changes
+
+- 9ca6995: The projects move from the Overview page to a Projects page in the menu. `GET /v1/projects` now serves pages of rows (`limit`, `after`), loaded 25 at a time.
+
 ## 0.5.0
 
 ### Minor Changes
