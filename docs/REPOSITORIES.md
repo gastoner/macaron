@@ -100,6 +100,7 @@ flowchart TD
 
 - **Until the fork is ready**, the bot refuses requests on the repository ("still being onboarded"). GitHub creates a fork asynchronously; the job retries for about an hour.
 - **The comment** goes on the merged pull request of the last commit touching the repository's file, if it merged in the last day, once. It is written with `GH_ORG` (§3).
+- **The web app's Overview page** lists every configured project and repository for any signed-in user (`GET /v1/projects`), as Ready or Not ready. Not ready covers both a fork still being created and a failed onboarding: only the comment says why.
 - **A repository that leaves the configuration keeps its fork.** Nothing deletes one.
 - **Fork networks:** GitHub allows one fork per network, so upstreams of one network (an upstream and a test fork of it) share the bot's fork.
 - **Optional:** a PR to knowledge, `repos/org-x/repo-a/overview.md`.
