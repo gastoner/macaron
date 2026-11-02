@@ -178,12 +178,14 @@ A thread is an issue and the bot's open pull request for it, but they are separa
 |---|---|---|---|
 | issue | `triage`, `plan`, `reproduce` | default branch | |
 | issue | `implement` | default branch, on a new branch if the bot had one; supersedes the bot's open pull request | |
-| issue | `verify`, `review` | | refused: "runs on the pull request: mention me on #N" |
+| issue | `verify` | | refused: "runs on the pull request: mention me on #N" |
+| issue | `review` | | refused: "I don't review my own pull requests" when the bot has one open, else "this issue has none yet" |
 | bot's pull request | `triage`, `address_review`, `verify` | bot's branch | |
-| any pull request | `review` | pull request head | |
-| another pull request | `triage`, `verify` | pull request head | |
+| bot's pull request | `review` | | refused: "I don't review my own pull requests. To check this change, use `verify` on it" |
+| another pull request | `triage`, `verify`, `review` | pull request head | |
 | any pull request | `implement`, `plan` | | refused: "can only be used from an issue" |
-| any pull request | `reproduce` | | refused: "can only be used from an issue. On a pull request, use `review` or `verify`" |
+| bot's pull request | `reproduce` | | refused: "can only be used from an issue. On this pull request, use `verify`" |
+| another pull request | `reproduce` | | refused: "can only be used from an issue. On a pull request, use `review` or `verify`" |
 
 - **One subject at a time, one run at a time per thread.** The worker takes the subject of the oldest pending request; requests on the other subject wait for the next pass. The thread keeps one ledger and one set of caps.
 - **Superseding.** A fresh `implement` opens its new pull request first, then closes the bot's previous one with "Superseded by #N", so a failed attempt never leaves the issue without one. No history of earlier pull requests is kept.
