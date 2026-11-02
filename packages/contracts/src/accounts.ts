@@ -303,16 +303,21 @@ export type LlmKeyEvents = z.infer<typeof LlmKeyEvents>;
 export const LlmKeyEventsQuery = UsageQuery;
 export type LlmKeyEventsQuery = z.infer<typeof LlmKeyEventsQuery>;
 
-/** A configured repository, as every signed-in user may see it: never its settings. */
-export const ProjectRepo = z.object({
-  repo: RepoSlug,
-  /** The bot's fork once it is ready; null means the bot still refuses requests here. */
+/** A configured repository (or a project without any), as every signed-in user may see it: never its settings. */
+export const ProjectRow = z.object({
+  project: z.string(),
+  /** Null for a project that has no repository yet. */
+  repo: RepoSlug.nullable(),
+  /** The bot's fork once it is ready; null means the bot still refuses requests on `repo`. */
   fork: RepoSlug.nullable(),
 });
-export type ProjectRepo = z.infer<typeof ProjectRepo>;
+export type ProjectRow = z.infer<typeof ProjectRow>;
 
-export const Project = z.object({ name: z.string(), repos: z.array(ProjectRepo) });
-export type Project = z.infer<typeof Project>;
+export const ProjectsPage = z.object({ rows: z.array(ProjectRow), nextCursor: z.string().nullable() });
+export type ProjectsPage = z.infer<typeof ProjectsPage>;
 
-export const Projects = z.object({ projects: z.array(Project) });
-export type Projects = z.infer<typeof Projects>;
+export const ProjectsQuery = z.object({
+  after: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+});
+export type ProjectsQuery = z.infer<typeof ProjectsQuery>;
