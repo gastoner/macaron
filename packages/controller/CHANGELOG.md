@@ -1,5 +1,11 @@
 # @open-macaron/controller
 
+## 0.10.0
+
+### Minor Changes
+
+- 891f775: The bot refuses `@macaron-bot review` on its own open pull request, and from an issue that has one, and suggests `verify` instead.
+
 ## 0.9.0
 
 ### Minor Changes
