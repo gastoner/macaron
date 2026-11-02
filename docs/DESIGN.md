@@ -278,8 +278,8 @@ The controller has three GitHub tokens, all in its own Kubernetes Secret. Exact 
 | Token | Type | Can do |
 |---|---|---|
 | `GH_PUSH` | fine-grained PAT, owner macaron-bot | Contents and Workflows write on its repos, which are only forks. Workflows is needed to carry upstream's own commits into a fork (sync, new branch) when they touch `.github/workflows/`, which active upstreams do weekly. It adds no reach: the forks hold no secrets and keep Actions disabled, a fork's pull request runs upstream CI as untrusted whatever it contains, and the Gate and `ForkCommitter` both refuse any bot change under `.github/` |
-| `GH_INTERACT` | classic PAT, scopes `repo` and `notifications` | Comments, reactions, PRs, notifications on upstream repos; blocked from `open-macaron` by org policy |
-| `GH_ORG` | fine-grained PAT, owner open-macaron | `runner`: Actions write (start and cancel runs); `knowledge`: Pull requests write (`remember:` proposals) |
+| `GH_INTERACT` | classic PAT, scopes `repo` and `notifications` | Comments, reactions, PRs, notifications on upstream repos; creates and configures the bot's forks; blocked from `open-macaron` by org policy |
+| `GH_ORG` | fine-grained PAT, owner open-macaron | `runner`: Actions write (start and cancel runs); `knowledge`: Pull requests write (`remember:` proposals); `config`: Pull requests write (onboarding comments) |
 
 ### Harness contract (`packages/agent-cli/src/harness.ts`, `packages/contracts`)
 
@@ -607,7 +607,7 @@ Self-hosted runners next to the controller are deliberately not used. The machin
 
 All `open-macaron` repos, the `runner` Actions logs, the images and the knowledge base are public. Consequences:
 
-- **Upstream repos must be public.** The config schema rejects private repos, because agent transcripts appear in public run logs. `GH_INTERACT` holds the `repo` scope all the same, which also reaches private repositories the bot can access: this rule, not the token, keeps the bot on public ones.
+- **Upstream repos must be public.** The controller refuses to fork a private repo, so it can't be onboarded, because agent transcripts appear in public run logs. `GH_INTERACT` holds the `repo` scope all the same, which also reaches private repositories the bot can access: this rule, not the token, keeps the bot on public ones.
 - **The OIDC check uses immutable ids** (`repository_id`, `repository_owner_id`), not names. Anyone can fork `runner` and run its workflows in their fork, but their token carries another `repository_id` and is rejected. Manually dispatched runs without a ticket fail at bootstrap.
 - **Workflow hygiene:**
   - no `pull_request_target` and no `workflow_run` triggers on untrusted input;
