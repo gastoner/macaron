@@ -1,5 +1,17 @@
 # @open-macaron/agent-cli
 
+## 0.2.0
+
+### Minor Changes
+
+- 9e9b47f: `implement` and `address_review` runs get the project's rules from open-macaron/knowledge: an index in the system prompt, the full text in a file per rule, and the instruction to check their changes against the rules that match before finishing.
+
+### Patch Changes
+
+- Updated dependencies [9e9b47f]
+  - @open-macaron/contracts@0.11.0
+  - @open-macaron/review@0.3.11
+
 ## 0.1.10
 
 ### Patch Changes
