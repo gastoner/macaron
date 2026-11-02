@@ -107,7 +107,7 @@ export interface StatusHeader {
   readonly mode: string;
   readonly platform: Platform;
   readonly runUrl: string | null;
-  readonly knowledge: RunKnowledge;
+  readonly knowledge: Pick<RunKnowledge, "commit" | "lessons">;
 }
 
 /** What a compact answer's footer says about its run: the status header's facts, the runner and the run's id. */
@@ -140,7 +140,7 @@ export function runFooter(footer: RunFooter, where: string, spent: string): stri
   return ["---", `<sub>${[...parts, ...lessonsPart(footer.knowledge)].join(" · ")}</sub>`, ...(where === "" ? [] : [where]), spent].join("\n");
 }
 
-function lessonsPart({ commit, lessons }: RunKnowledge): string[] {
+function lessonsPart({ commit, lessons }: StatusHeader["knowledge"]): string[] {
   if (commit === null || lessons.length === 0) return [];
   const count = `${String(lessons.length)} lesson${lessons.length === 1 ? "" : "s"}`;
   return [`${count} from [open-macaron/knowledge@${commit.slice(0, 7)}](https://github.com/open-macaron/knowledge/tree/${commit})`];

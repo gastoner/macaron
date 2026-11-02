@@ -298,7 +298,7 @@ interface RunContext {
   priorLoops: LoopSummary[]; commands: Commands; attachments: AttachmentLimits;
   platform: Platform; platforms: Platform[];            // the run's OS, and where a triage may escalate
   review?: ReviewContext;                               // set iff mode is `review`: the rules to check
-  knowledge: RunKnowledge;                              // lessons (rules go in `review`)
+  knowledge: RunKnowledge;                              // lessons; rules when the mode can commit (a review's go in `review`)
 }
 
 interface RunResult {
@@ -425,7 +425,7 @@ The knowledge repository holds two kinds of content, with different authors and 
 | What | What changed code must look like ("use Svelte 5 runes") | Facts learned ("e2e tests need `xvfb-run`", "reviewers prefer small PRs") |
 | Written by | Humans (the folder's owners) | The bot proposes, the folder's owners approve |
 | Used for | Implementing, and the per-rule review (§6.3) | Context for the agent |
-| Loaded | Only rules whose globs match the files in play (reviews) | As skills in every working run: names and descriptions in context, a body when the agent loads it |
+| Loaded | Reviews: only rules whose globs match the files in play. `implement` and `address_review`: an index in the prompt, the full text in a file per rule | As skills in every working run: names and descriptions in context, a body when the agent loads it |
 | Identity | Stable id (`sandbox/no-runtime-json-read`), cited by review tables; never reused | File name |
 
 A lesson becomes a rule only when a human promotes it: the bot never writes rules, because the reviewer enforces them. Nothing is read from upstream repositories for now (beyond the harness loading their `AGENTS.md` / `CLAUDE.md` natively).
@@ -493,13 +493,13 @@ const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 ```
 ````
 
-**Every working run gets the repository's lessons** (global → project → repo), read with the rules by the controller and pinned to their knowledge commit in the run's context (`context.knowledge`). agent-cli writes one `SKILL.md` per lesson under `$RUNNER_TEMP/macaron-knowledge/.claude/skills/` and passes that directory to Claude Code with `--add-dir`: never inside the checkout, whose every file `finish` publishes. The status comment's first line names the commit and the lesson count, as a review names its rules' commit. Reviews get rules only. A run whose knowledge can't be read starts without lessons: they help, they don't gate.
+**Every working run gets the repository's lessons** (global → project → repo), read with the rules by the controller and pinned to their knowledge commit in the run's context (`context.knowledge`). agent-cli writes one `SKILL.md` per lesson under `$RUNNER_TEMP/macaron-knowledge/.claude/skills/` and passes that directory to Claude Code with `--add-dir`: never inside the checkout, whose every file `finish` publishes. The status comment's first line names the commit and the lesson count, as a review names its rules' commit. Reviews get rules only. A run whose knowledge can't be read starts without lessons or rules: they help, they don't gate.
 
 Lessons carry `topic`, `description`, optional `applies_to`, `sources`, `last_verified` and `confidence`. A lesson is an [Agent Skill](https://agentskills.io): its slug is the skill's name and `description` (at most 1024 characters) says what it covers and when it matters. Claude Code, Codex and OpenCode keep only names and descriptions in context and load a lesson's body when the agent asks for it, so runs carry every lesson without growing their prompts. `description` is optional until every lesson has one; the topic stands in for it.
 
 ### 6.3 Using rules
 
-- **Selection is deterministic.** The controller merges global → project → repo and keeps the rules whose `applies_to` / `exclude` match the files in play: the PR's diff for a review, the bot's own diff before publishing. For `implement` the files aren't known in advance: the prompt carries the rule index (id, title, globs), and the agent reads the full rules for what it touches.
+- **Selection is deterministic.** The controller merges global → project → repo and keeps the rules whose `applies_to` / `exclude` match the files in play: the PR's diff for a review. For `implement` and `address_review` the files aren't known in advance: the prompt carries the rule index (id, severity, title, globs), agent-cli writes each rule to `$RUNNER_TEMP/macaron-knowledge/rules/`, and the agent reads the full rules for what it touches and checks its changes against them before finishing. Nothing enforces that self-check: only a review verifies it.
 - **A review is a run** (`@macaron-bot review`, mode `review`), on the same path as `implement`: capped key (`reviewCost.baseUsd + reviewCost.perRuleUsd × rules`, at most `budgets.review`: the cost follows the rule count), OIDC bootstrap, `run.yml`, artifact, Gate, settlement, `retry` and `stop`. The model is `models.review` (a cheap one). `full-environment` is off: on a pull request anyone can open, the environment step would run that pull request's code.
 - **Fixed phases, run by code, not by the model.** A first version ran one session over every rule and asked for one subagent per rule past 5 rules. On 18 rules that became a burst of 70+ requests that hit the key's rate limit and budget, and the fan-out (so the cost) changed from run to run. Following GitHub's accessibility agent ([Efficient token consumption](https://github.blog/ai-and-ml/github-copilot/building-a-general-purpose-accessibility-agent-and-what-we-learned-in-the-process/)): few sessions with fixed roles, a fixed order, filtering before handing work on, a schema for every handoff. `judge()` (`packages/review`) runs:
   1. **triage** (more than 8 rules, diff small enough to inline): one session with no tools at all, the diff and every rule; it drops the rules whose question can't arise in the change (`{ rules: [{ ruleId, applies, reason }] }`). Unsure means `applies`; a rule it doesn't answer for is checked;

@@ -50,7 +50,7 @@ export interface HarnessRun {
   readonly task: string;
   /** MCP servers the environment provides (e.g. to drive Podman Desktop). */
   readonly mcpConfigFile?: string | undefined;
-  /** A directory whose `.claude/skills/` holds the run's lessons. */
+  /** A directory whose `.claude/skills/` holds the run's lessons, and `rules/` its rules. */
   readonly skillsDir?: string | undefined;
 }
 

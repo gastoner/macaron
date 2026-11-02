@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { Changes, CommitSha, RepoSlug, RunContext, RunResult, Ticket } from "@open-macaron/contracts";
+import { Changes, CommitSha, PublishedRule, RepoSlug, RunContext, RunResult, Ticket } from "@open-macaron/contracts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attach, finish } from "../src/commands.ts";
 import { type Inputs, paths } from "../src/inputs.ts";
@@ -130,6 +130,22 @@ describe("finish", () => {
 });
 
 describe("prompts", () => {
+  it("index the rules with their globs and files, and ask the agent to check its changes against them", async () => {
+    const context = RunContext.parse(JSON.parse(await readFile(paths(inputs).contextFile, "utf8")));
+    expect(systemPrompt(context, "/out")).not.toContain("## Project rules");
+
+    const rule = PublishedRule.parse({ id: "podman-desktop/svelte/runes", scope: "podman-desktop", title: "Use runes", severity: "error", appliesTo: ["**/*.svelte"], exclude: ["vendor/**"], sources: [], body: "b" });
+    const everywhere = PublishedRule.parse({ ...rule, id: "global/dco", scope: "global", title: "Sign off", severity: "warning", appliesTo: null, exclude: [] });
+    const system = systemPrompt(RunContext.parse({ ...context, knowledge: { commit: "a".repeat(40), lessons: [], rules: [rule, everywhere] } }), "/out", [
+      { rule, path: "/k/rules/runes.md" },
+      { rule: everywhere, path: "/k/rules/dco.md" },
+    ]);
+    expect(system).toContain(`these rules (from open-macaron/knowledge@${"a".repeat(40)})`);
+    expect(system).toContain("- `podman-desktop/svelte/runes` (error): Use runes. Applies to `**/*.svelte`, except `vendor/**`. Full text: `/k/rules/runes.md`");
+    expect(system).toContain("- `global/dco` (warning): Sign off. Applies to every file. Full text: `/k/rules/dco.md`");
+    expect(system).toContain("`git status --short`");
+  });
+
   it("tell the agent its mode, the allowed actions, where to write, how to link code, and include the schema", async () => {
     const context = RunContext.parse(JSON.parse(await readFile(paths(inputs).contextFile, "utf8")));
     const system = systemPrompt(context, "/out");

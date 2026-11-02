@@ -1,10 +1,10 @@
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CommitSha, PublishedLesson, RunKnowledge } from "@open-macaron/contracts";
+import { CommitSha, PublishedLesson, PublishedRule, RunKnowledge } from "@open-macaron/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 import { claudeArgs, claudeEnvironment } from "../src/harness.ts";
-import { skillName, writeSkills } from "../src/skills.ts";
+import { skillName, writeRules, writeSkills } from "../src/skills.ts";
 
 const lesson = (scope: string, slug: string, description?: string) =>
   PublishedLesson.parse({
@@ -31,6 +31,34 @@ describe("skillName", () => {
     const long = skillName(lesson("Some-Owner/Some.Repository_Name", "a".repeat(64)));
     expect(long).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
     expect(long.length).toBeLessThanOrEqual(64);
+  });
+});
+
+describe("writeRules", () => {
+  const rule = (id: string, scope: string) => PublishedRule.parse({ id, scope, title: `Title of ${id}`, severity: "error", appliesTo: null, exclude: [], sources: ["https://example.org/why"], body: "Do this.\n" });
+
+  it("writes one file per rule, flat and named after it, with its full text and origin", async () => {
+    dir = await mkdtemp(join(tmpdir(), "macaron-rules-"));
+    const first = rule("podman-desktop/tests/naming", "podman-desktop");
+    const files = await writeRules(dir, RunKnowledge.parse({ commit: CommitSha.parse("abcdef1".padEnd(40, "0")), lessons: [], rules: [first] }));
+
+    expect(files).toEqual([{ rule: first, path: join(dir, "rules", "podman-desktop-naming.md") }]);
+    const text = await readFile(join(dir, "rules", "podman-desktop-naming.md"), "utf8");
+    expect(text).toContain("# Title of podman-desktop/tests/naming\n\nDo this.\n");
+    expect(text).toContain("Rule `podman-desktop/tests/naming` from open-macaron/knowledge@abcdef1, severity error. Sources: https://example.org/why");
+  });
+
+  it("keeps rules with one slug in two categories apart, and never writes outside its folder", async () => {
+    dir = await mkdtemp(join(tmpdir(), "macaron-rules-"));
+    const files = await writeRules(dir, RunKnowledge.parse({ commit: null, lessons: [], rules: [rule("sandbox/a/naming", "sandbox"), rule("sandbox/b/naming", "sandbox"), rule("sandbox/../../escape", "sandbox")] }));
+
+    expect((await readdir(join(dir, "rules"))).sort()).toEqual(["sandbox-escape.md", "sandbox-naming-2.md", "sandbox-naming.md"]);
+    expect(files.every((file) => file.path.startsWith(join(dir ?? "", "rules")))).toBe(true);
+  });
+
+  it("writes nothing when the run has no rules", async () => {
+    dir = await mkdtemp(join(tmpdir(), "macaron-rules-"));
+    expect(await writeRules(dir, RunKnowledge.parse({ commit: null, lessons: [] }))).toEqual([]);
   });
 });
 

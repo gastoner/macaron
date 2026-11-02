@@ -9,7 +9,7 @@ import { changesSince, checkout, crlfIntroduced } from "./git.ts";
 import { claudeBinary, claudeEnvironment, installHarness, runHarness } from "./harness.ts";
 import { type Inputs, type Paths, paths, readInputs } from "./inputs.ts";
 import { systemPrompt, taskPrompt } from "./prompts.ts";
-import { writeSkills } from "./skills.ts";
+import { writeRules, writeSkills } from "./skills.ts";
 import { fetchPullBase } from "./review-diff.ts";
 
 /** What bootstrap hands to the later steps, apart from the key (kept in its own private file). */
@@ -63,7 +63,8 @@ export async function run(inputs: Inputs = readInputs()): Promise<number> {
   if (context.mode === "review") return review(inputs, context, state);
   const systemPromptFile = join(p.state, "system-prompt.md");
   const environment = await environmentExtras(p.environment);
-  await writeFile(systemPromptFile, [systemPrompt(context, p.out), environment.notes].filter((part) => part !== undefined).join("\n\n"));
+  const rules = await writeRules(p.knowledge, context.knowledge);
+  await writeFile(systemPromptFile, [systemPrompt(context, p.out, rules), environment.notes].filter((part) => part !== undefined).join("\n\n"));
   const exitCode = await runHarness({
     harness: state.harness,
     toolsDir: p.tools,
@@ -73,7 +74,7 @@ export async function run(inputs: Inputs = readInputs()): Promise<number> {
     systemPromptFile,
     task: taskPrompt(context),
     mcpConfigFile: environment.mcpConfigFile,
-    skillsDir: context.knowledge.lessons.length === 0 ? undefined : await writeSkills(p.knowledge, context.knowledge),
+    skillsDir: context.knowledge.lessons.length === 0 && rules.length === 0 ? undefined : await writeSkills(p.knowledge, context.knowledge),
   });
   await rm(p.keyFile, { force: true });
   if (exitCode !== 0) core.warning(`harness exited with ${String(exitCode)}`);
