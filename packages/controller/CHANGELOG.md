@@ -1,5 +1,17 @@
 # @open-macaron/controller
 
+## 0.8.0
+
+### Minor Changes
+
+- a71ccab: The web app's Overview page lists every configured project and repository, with whether each one finished onboarding (`GET /v1/projects`).
+
+### Patch Changes
+
+- Updated dependencies [a71ccab]
+  - @open-macaron/contracts@0.9.0
+  - @open-macaron/review@0.3.9
+
 ## 0.7.0
 
 ### Minor Changes
