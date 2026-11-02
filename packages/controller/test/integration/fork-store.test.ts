@@ -28,6 +28,14 @@ describe("DrizzleForkStore", () => {
     expect(await store.readyName("org-x/repo-a")).toBe("abc123-repo-a");
   });
 
+  it("lists only the forks that are ready", async () => {
+    await store.record({ upstreamId: 50, upstreamKey: "org-x/not-ready", forkId: 150, forkName: "def456-not-ready" });
+
+    const names = await store.readyNames();
+    expect(names.get("org-x/repo-a")).toBe("abc123-repo-a");
+    expect(names.has("org-x/not-ready")).toBe(false);
+  });
+
   it("keeps readiness when the fork is recorded again", async () => {
     await store.record({ upstreamId: 1, upstreamKey: "org-x/repo-a", forkId: 101, forkName: "abc123-repo-a" });
 

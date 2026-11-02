@@ -633,3 +633,31 @@ export type SetEndpointEnabledResponses = {
 };
 
 export type SetEndpointEnabledResponse = SetEndpointEnabledResponses[keyof SetEndpointEnabledResponses];
+
+export type ListProjectsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/projects';
+};
+
+export type ListProjectsErrors = {
+    /**
+     * No valid session
+     */
+    401: unknown;
+};
+
+export type ListProjectsResponses = {
+    200: {
+        projects: Array<{
+            name: string;
+            repos: Array<{
+                repo: string;
+                fork: string | null;
+            }>;
+        }>;
+    };
+};
+
+export type ListProjectsResponse = ListProjectsResponses[keyof ListProjectsResponses];

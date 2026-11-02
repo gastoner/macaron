@@ -50,7 +50,7 @@ flowchart LR
   HTTP["HttpModule<br/>Bootstrap, Webhook, Health controllers"] --> RUNS
   ING["IngestModule<br/>NotificationsPoller, IngestService,<br/>ThreadWorker, ContextBuilder, ThreadStates"] --> RUNS
   RUNS["RunsModule<br/>RunLauncher, OidcVerifier,<br/>ArtifactDownloader, Housekeeping"] --> BUD["BudgetModule<br/>RunKeysRegistry (BifrostKeys, OpenRouterKeys),<br/>BudgetService"]
-  RUNS --> PUB["PublishModule<br/>Publisher, ForkCommitter, UpstreamWriter,<br/>ReactionTargets, EvidenceHost, KnowledgeProposer,<br/>ForkRegistry, OnboardingNotice"]
+  RUNS --> PUB["PublishModule<br/>Publisher, ForkCommitter, UpstreamWriter,<br/>ReactionTargets, EvidenceHost, KnowledgeProposer,<br/>ForkRegistry, OnboardingNotice, ProjectsService"]
   RUNS --> REV["ReviewModule<br/>KnowledgeClient, PullDiffReader"]
   ING --> PUB
   ING --> REV

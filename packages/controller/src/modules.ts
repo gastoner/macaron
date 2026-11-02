@@ -26,6 +26,7 @@ import { CONFIGURED_MODELS, KEY_RING, LlmKeysService } from "./keys/llm-keys.ser
 import { AdminController } from "./http/admin.controller.ts";
 import { BootstrapController } from "./http/bootstrap.controller.ts";
 import { MeController } from "./http/me.controller.ts";
+import { ProjectsController } from "./http/projects.controller.ts";
 import { HealthController } from "./http/health.controller.ts";
 import { WebhookController } from "./http/webhook.controller.ts";
 import { ContextBuilder } from "./ingest/context-builder.ts";
@@ -39,6 +40,7 @@ import { Jobs } from "./jobs/jobs.ts";
 import { EvidenceHost } from "./publish/evidence-host.ts";
 import { ForkCommitter } from "./publish/fork-committer.ts";
 import { DrizzleForkStore, ForkRegistry, ForkStore } from "./publish/fork-registry.ts";
+import { ProjectsService } from "./publish/projects.service.ts";
 import { OnboardingNotice } from "./config/onboarding-notice.ts";
 import { Publisher } from "./publish/publisher.ts";
 import { KnowledgeProposer } from "./knowledge/knowledge-proposer.ts";
@@ -110,8 +112,9 @@ export class BudgetModule {}
     { provide: ForkStore, useClass: DrizzleForkStore },
     ForkRegistry,
     OnboardingNotice,
+    ProjectsService,
   ],
-  exports: [ForkCommitter, UpstreamWriter, ReactionTargets, Publisher, ForkRegistry],
+  exports: [ForkCommitter, UpstreamWriter, ReactionTargets, Publisher, ForkRegistry, ProjectsService],
 })
 export class PublishModule {}
 
@@ -165,10 +168,10 @@ export class IngestModule {}
 
 /**
  * The edge exposes /v1/bootstrap and /v1/webhook (and better-auth's /api/auth, mounted in main.ts).
- * /v1/me and /v1/admin are reached only by the web app, through the cluster Service.
+ * /v1/me, /v1/admin and /v1/projects are reached only by the web app, through the cluster Service.
  */
 @Module({
-  imports: [RunsModule, AccountsModule, TerminusModule],
-  controllers: [BootstrapController, WebhookController, HealthController, MeController, AdminController],
+  imports: [RunsModule, AccountsModule, PublishModule, TerminusModule],
+  controllers: [BootstrapController, WebhookController, HealthController, MeController, AdminController, ProjectsController],
 })
 export class HttpModule {}
