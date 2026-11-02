@@ -1,6 +1,7 @@
 import type { LucideIcon } from "@lucide/svelte";
 import ActivityIcon from "@lucide/svelte/icons/activity";
 import ChartColumnIcon from "@lucide/svelte/icons/chart-column";
+import FolderGit2Icon from "@lucide/svelte/icons/folder-git-2";
 import GaugeIcon from "@lucide/svelte/icons/gauge";
 import KeyRoundIcon from "@lucide/svelte/icons/key-round";
 import MailPlusIcon from "@lucide/svelte/icons/mail-plus";
@@ -27,6 +28,7 @@ export const navigation: readonly NavSection[] = [
     items: [
       { title: "Overview", route: "/(app)", icon: GaugeIcon },
       { title: "Usage", route: "/(app)/usage", icon: ChartColumnIcon },
+      { title: "Projects", route: "/(app)/projects", icon: FolderGit2Icon },
     ],
   },
   {

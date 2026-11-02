@@ -637,7 +637,10 @@ export type SetEndpointEnabledResponse = SetEndpointEnabledResponses[keyof SetEn
 export type ListProjectsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        after?: string;
+        limit?: number;
+    };
     url: '/v1/projects';
 };
 
@@ -650,13 +653,12 @@ export type ListProjectsErrors = {
 
 export type ListProjectsResponses = {
     200: {
-        projects: Array<{
-            name: string;
-            repos: Array<{
-                repo: string;
-                fork: string | null;
-            }>;
+        rows: Array<{
+            project: string;
+            repo: string | null;
+            fork: string | null;
         }>;
+        nextCursor: string | null;
     };
 };
 

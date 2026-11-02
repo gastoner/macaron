@@ -408,12 +408,16 @@ export const zSetEndpointEnabledResponse = z.object({
     createdAt: z.iso.datetime().regex(/^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$/)
 });
 
+export const zListProjectsQuery = z.object({
+    after: z.string().max(200).optional(),
+    limit: z.int().gte(1).lte(100).optional().default(25)
+});
+
 export const zListProjectsResponse = z.object({
-    projects: z.array(z.object({
-        name: z.string(),
-        repos: z.array(z.object({
-            repo: z.string().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/),
-            fork: z.string().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/).nullable()
-        }))
-    }))
+    rows: z.array(z.object({
+        project: z.string(),
+        repo: z.string().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/).nullable(),
+        fork: z.string().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/).nullable()
+    })),
+    nextCursor: z.string().nullable()
 });

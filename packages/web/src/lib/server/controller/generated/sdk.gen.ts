@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
 import type { ApproveEndpointData, ApproveEndpointErrors, ApproveEndpointResponses, CreateInvitationData, CreateInvitationErrors, CreateInvitationResponses, DeleteMyLlmKeyData, DeleteMyLlmKeyErrors, DeleteMyLlmKeyResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyLlmKeyData, GetMyLlmKeyErrors, GetMyLlmKeyEventsData, GetMyLlmKeyEventsErrors, GetMyLlmKeyEventsResponses, GetMyLlmKeyResponses, GetMyMonthData, GetMyMonthErrors, GetMyMonthResponses, GetMyUsageData, GetMyUsageErrors, GetMyUsageResponses, ListEndpointsData, ListEndpointsResponses, ListInvitationsData, ListInvitationsErrors, ListInvitationsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRefusalsData, ListRefusalsErrors, ListRefusalsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListUsersData, ListUsersResponses, RevokeInvitationData, RevokeInvitationResponses, SaveMyLlmKeyData, SaveMyLlmKeyErrors, SaveMyLlmKeyResponses, SetEndpointEnabledData, SetEndpointEnabledErrors, SetEndpointEnabledResponses, SetMyMonthlyCapData, SetMyMonthlyCapErrors, SetMyMonthlyCapResponses, SetUserCapabilitiesData, SetUserCapabilitiesErrors, SetUserCapabilitiesResponses } from './types.gen.ts';
-import { zApproveEndpointBody, zApproveEndpointResponse, zCreateInvitationBody, zCreateInvitationResponse, zDeleteMyLlmKeyResponse, zGetMeResponse, zGetMyLlmKeyEventsQuery, zGetMyLlmKeyEventsResponse, zGetMyLlmKeyResponse, zGetMyMonthResponse, zGetMyUsageQuery, zGetMyUsageResponse, zListEndpointsResponse, zListInvitationsResponse, zListProjectsResponse, zListRefusalsQuery, zListRefusalsResponse, zListRunsQuery, zListRunsResponse, zListUsersResponse, zRevokeInvitationPath, zRevokeInvitationResponse, zSaveMyLlmKeyBody, zSaveMyLlmKeyResponse, zSetEndpointEnabledBody, zSetEndpointEnabledPath, zSetEndpointEnabledResponse, zSetMyMonthlyCapBody, zSetMyMonthlyCapResponse, zSetUserCapabilitiesBody, zSetUserCapabilitiesPath, zSetUserCapabilitiesResponse } from './zod.gen.ts';
+import { zApproveEndpointBody, zApproveEndpointResponse, zCreateInvitationBody, zCreateInvitationResponse, zDeleteMyLlmKeyResponse, zGetMeResponse, zGetMyLlmKeyEventsQuery, zGetMyLlmKeyEventsResponse, zGetMyLlmKeyResponse, zGetMyMonthResponse, zGetMyUsageQuery, zGetMyUsageResponse, zListEndpointsResponse, zListInvitationsResponse, zListProjectsQuery, zListProjectsResponse, zListRefusalsQuery, zListRefusalsResponse, zListRunsQuery, zListRunsResponse, zListUsersResponse, zRevokeInvitationPath, zRevokeInvitationResponse, zSaveMyLlmKeyBody, zSaveMyLlmKeyResponse, zSetEndpointEnabledBody, zSetEndpointEnabledPath, zSetEndpointEnabledResponse, zSetMyMonthlyCapBody, zSetMyMonthlyCapResponse, zSetUserCapabilitiesBody, zSetUserCapabilitiesPath, zSetUserCapabilitiesResponse } from './zod.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -388,13 +388,13 @@ export const setEndpointEnabled = <ThrowOnError extends boolean = false>(options
 });
 
 /**
- * Every configured project, with each repository's fork once it is ready
+ * A page of the configured projects' repositories, each with its fork once it is ready
  */
 export const listProjects = <ThrowOnError extends boolean = false>(options?: Options<ListProjectsData, ThrowOnError>): RequestResult<ListProjectsResponses, ListProjectsErrors, ThrowOnError> => (options?.client ?? client).get<ListProjectsResponses, ListProjectsErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: z.never().optional(),
-        query: z.never().optional()
+        query: zListProjectsQuery.optional()
     }).parseAsync(data),
     responseValidator: async (data) => await zListProjectsResponse.parseAsync(data),
     security: [{
