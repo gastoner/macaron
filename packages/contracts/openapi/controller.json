@@ -2797,7 +2797,28 @@
     "/v1/projects": {
       "get": {
         "operationId": "listProjects",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2806,47 +2827,41 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "projects": {
+                    "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "name": {
+                          "project": {
                             "type": "string"
                           },
-                          "repos": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "repo": {
-                                  "type": "string",
-                                  "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$"
-                                },
-                                "fork": {
-                                  "nullable": true,
-                                  "type": "string",
-                                  "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$"
-                                }
-                              },
-                              "required": [
-                                "repo",
-                                "fork"
-                              ],
-                              "additionalProperties": false
-                            }
+                          "repo": {
+                            "nullable": true,
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$"
+                          },
+                          "fork": {
+                            "nullable": true,
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$"
                           }
                         },
                         "required": [
-                          "name",
-                          "repos"
+                          "project",
+                          "repo",
+                          "fork"
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "nextCursor": {
+                      "nullable": true,
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "projects"
+                    "rows",
+                    "nextCursor"
                   ],
                   "additionalProperties": false
                 }
@@ -2862,7 +2877,7 @@
             "cookie": []
           }
         ],
-        "summary": "Every configured project, with each repository's fork once it is ready",
+        "summary": "A page of the configured projects' repositories, each with its fork once it is ready",
         "tags": [
           "projects"
         ]

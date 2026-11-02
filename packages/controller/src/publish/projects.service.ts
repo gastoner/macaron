@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { type Project, type Projects, repoKey, RepoSlug } from "@open-macaron/contracts";
+import { type ProjectRow, type ProjectsPage, repoKey, RepoSlug } from "@open-macaron/contracts";
 import { RepoConfigService } from "../config/repo-config.service.ts";
 import { ForkRegistry } from "./fork-registry.ts";
 
@@ -14,16 +14,23 @@ export class ProjectsService {
     private readonly forks: ForkRegistry,
   ) {}
 
-  /** Every project by name, its repositories by slug; a project without one is kept. */
-  async list(): Promise<Projects> {
+  /**
+   * A page of rows: one per repository, one for a project without any. The cursor is a row's key,
+   * not an offset: a configuration reloaded between two pages neither repeats nor skips a row.
+   */
+  async page(limit: number, after: string | undefined): Promise<ProjectsPage> {
     const { projects, repos } = this.config.snapshot;
+    const keyed: { readonly key: string; readonly project: string; readonly repo: RepoSlug | null }[] = [...repos.values()].map(({ project, repo }) => ({ key: `${project}/${repoKey(repo)}`, project, repo }));
+    const populated = new Set(keyed.map((row) => row.project));
+    for (const project of projects.keys()) if (!populated.has(project)) keyed.push({ key: `${project}/`, project, repo: null });
+    // By code unit, as the cursor is compared. Project slugs hold no `/`, so a project's rows stay together.
+    const sorted = keyed.filter((row) => after === undefined || row.key > after).sort((a, b) => (a.key < b.key ? -1 : 1));
+    const page = sorted.slice(0, limit);
     const ready = await this.forks.readyForks();
-    const byName = new Map<string, Project>([...projects.keys()].map((name) => [name, { name, repos: [] }]));
-    const sorted = [...repos.values()].sort((a, b) => a.repo.localeCompare(b.repo));
-    for (const { project, repo } of sorted) {
-      const fork = ready.get(repoKey(repo));
-      byName.get(project)?.repos.push({ repo, fork: fork === undefined ? null : RepoSlug.parse(`${fork.owner}/${fork.repo}`) });
-    }
-    return { projects: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+    const rows = page.map(({ project, repo }): ProjectRow => {
+      const fork = repo === null ? undefined : ready.get(repoKey(repo));
+      return { project, repo, fork: fork === undefined ? null : RepoSlug.parse(`${fork.owner}/${fork.repo}`) };
+    });
+    return { rows, nextCursor: sorted.length > limit ? (page.at(-1)?.key ?? null) : null };
   }
 }
