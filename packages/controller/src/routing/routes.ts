@@ -80,11 +80,18 @@ const fromBotBranch: Rule = { checkout: "botBranch" };
 const fromPullRequestHead: Rule = { checkout: "pullRequestHead" };
 const issueOnly: Rule = { refuse: (mode) => `\`${mode}\` can only be used from an issue.` };
 const reproduceOnIssue: Rule = { refuse: () => "`reproduce` can only be used from an issue. On a pull request, use `review` or `verify`." };
+const reproduceOnOwnPullRequest: Rule = { refuse: () => "`reproduce` can only be used from an issue. On this pull request, use `verify`." };
 const pullRequestOnly: Rule = {
   refuse: (mode, state) =>
     state.ownPullRequest === undefined
       ? `\`${mode}\` runs on a pull request, and this issue has none yet.`
       : `\`${mode}\` runs on the pull request: mention me on #${String(state.ownPullRequest)}.`,
+};
+// The bot answering its own review would read as a conversation with itself.
+const NOT_OWN_REVIEW = "I don't review my own pull requests. To check this change, use `verify` on it.";
+const notOwnPullRequest: Rule = { refuse: () => NOT_OWN_REVIEW };
+const reviewFromIssue: Rule = {
+  refuse: (mode, state) => (state.ownPullRequest === undefined ? `\`${mode}\` runs on a pull request, and this issue has none yet.` : NOT_OWN_REVIEW),
 };
 
 /**
@@ -101,17 +108,17 @@ export const ROUTES: Readonly<Record<SubjectKind, Readonly<Partial<Record<Mode, 
     // A fresh attempt: a new branch from the default branch, superseding the bot's open pull request.
     implement: fromDefaultBranch,
     verify: pullRequestOnly,
-    review: pullRequestOnly,
+    review: reviewFromIssue,
   },
   ownPullRequest: {
     triage: fromBotBranch,
     retro: fromBotBranch,
     address_review: fromBotBranch,
     verify: fromBotBranch,
-    review: fromPullRequestHead,
+    review: notOwnPullRequest,
     implement: issueOnly,
     plan: issueOnly,
-    reproduce: reproduceOnIssue,
+    reproduce: reproduceOnOwnPullRequest,
   },
   pullRequest: {
     triage: fromPullRequestHead,

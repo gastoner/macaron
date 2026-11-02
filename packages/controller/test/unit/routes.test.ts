@@ -39,9 +39,16 @@ describe("routes from an issue", () => {
     expect(route(afterClosedPullRequest, issue, "implement")).toEqual({ mode: "implement", subject: issue, checkout: { from: "defaultBranch" }, branch: `${BRANCH}-5` });
   });
 
-  it.each<[Mode]>([["verify"], ["review"]])("%s is refused, pointing to the pull request", (mode) => {
-    expect(route(withOwnPullRequest, issue, mode)).toEqual<Refusal>({ refused: `\`${mode}\` runs on the pull request: mention me on #17.` });
+  it.each<[Mode]>([["verify"], ["review"]])("%s is refused when the issue has no pull request", (mode) => {
     expect(route(fresh, issue, mode)).toEqual<Refusal>({ refused: `\`${mode}\` runs on a pull request, and this issue has none yet.` });
+  });
+
+  it("verify is refused, pointing to the pull request", () => {
+    expect(route(withOwnPullRequest, issue, "verify")).toEqual<Refusal>({ refused: "`verify` runs on the pull request: mention me on #17." });
+  });
+
+  it("review is refused without pointing to the bot's own pull request, where it would be refused again", () => {
+    expect(route(withOwnPullRequest, issue, "review")).toEqual<Refusal>({ refused: "I don't review my own pull requests. To check this change, use `verify` on it." });
   });
 });
 
@@ -50,22 +57,17 @@ describe("routes from the bot's own pull request", () => {
     expect(route(withOwnPullRequest, ownPullRequest, mode)).toEqual<Route>({ mode, subject: ownPullRequest, checkout: { from: "botBranch" }, branch: BRANCH });
   });
 
-  it("review checks the pull request's head", () => {
-    expect(route(withOwnPullRequest, ownPullRequest, "review")).toEqual<Route>({
-      mode: "review",
-      subject: ownPullRequest,
-      checkout: { from: "pullRequestHead", pullRequest: 17 },
-      branch: BRANCH,
-    });
+  it("review is refused: the bot doesn't review itself", () => {
+    expect(route(withOwnPullRequest, ownPullRequest, "review")).toEqual<Refusal>({ refused: "I don't review my own pull requests. To check this change, use `verify` on it." });
   });
 
   it.each<[Mode]>([["implement"], ["plan"]])("%s is refused: it belongs to the issue", (mode) => {
     expect(route(withOwnPullRequest, ownPullRequest, mode)).toEqual<Refusal>({ refused: `\`${mode}\` can only be used from an issue.` });
   });
 
-  it("reproduce is refused, suggesting review or verify", () => {
+  it("reproduce is refused, suggesting verify", () => {
     expect(route(withOwnPullRequest, ownPullRequest, "reproduce")).toEqual<Refusal>({
-      refused: "`reproduce` can only be used from an issue. On a pull request, use `review` or `verify`.",
+      refused: "`reproduce` can only be used from an issue. On this pull request, use `verify`.",
     });
   });
 });
@@ -82,6 +84,12 @@ describe("routes from another pull request", () => {
 
   it.each<[Mode]>([["implement"], ["plan"], ["reproduce"]])("%s is refused", (mode) => {
     expect("refused" in route(humanPullRequest, pullRequest, mode)).toBe(true);
+  });
+
+  it("reproduce suggests review or verify", () => {
+    expect(route(humanPullRequest, pullRequest, "reproduce")).toEqual<Refusal>({
+      refused: "`reproduce` can only be used from an issue. On a pull request, use `review` or `verify`.",
+    });
   });
 });
 
@@ -122,7 +130,7 @@ describe("platforms", () => {
     expect(route(fresh, issue, "reproduce", "linux")).toEqual(route(fresh, issue, "reproduce"));
   });
 
-  it.each<[Mode, Subject]>([["triage", issue], ["review", ownPullRequest]])("refuses %s on another platform: it doesn't set the project up", (mode, subject) => {
+  it.each<[Mode, Subject]>([["triage", issue], ["review", pullRequest]])("refuses %s on another platform: it doesn't set the project up", (mode, subject) => {
     expect(route(withOwnPullRequest, subject, mode, "windows")).toEqual<Refusal>({ refused: `\`${mode}\` doesn't set the project up, so it always runs on Linux.` });
   });
 
