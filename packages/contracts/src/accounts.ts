@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Capability } from "./capability.ts";
-import { GitHubLogin } from "./ids.ts";
+import { GitHubLogin, RepoSlug } from "./ids.ts";
 import { Mode } from "./mode.ts";
 
 // The web app's API on the controller (/v1/me, /v1/admin). Dates travel as ISO strings.
@@ -302,3 +302,17 @@ export type LlmKeyEvents = z.infer<typeof LlmKeyEvents>;
 
 export const LlmKeyEventsQuery = UsageQuery;
 export type LlmKeyEventsQuery = z.infer<typeof LlmKeyEventsQuery>;
+
+/** A configured repository, as every signed-in user may see it: never its settings. */
+export const ProjectRepo = z.object({
+  repo: RepoSlug,
+  /** The bot's fork once it is ready; null means the bot still refuses requests here. */
+  fork: RepoSlug.nullable(),
+});
+export type ProjectRepo = z.infer<typeof ProjectRepo>;
+
+export const Project = z.object({ name: z.string(), repos: z.array(ProjectRepo) });
+export type Project = z.infer<typeof Project>;
+
+export const Projects = z.object({ projects: z.array(Project) });
+export type Projects = z.infer<typeof Projects>;
