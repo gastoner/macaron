@@ -51,7 +51,7 @@ How `run.yml` gets the agent-cli:
 
 | Token (in the controller's Secret) | Type and owner | Permissions | Used for |
 |---|---|---|---|
-| `GH_INTERACT` | classic PAT of macaron-bot | `public_repo`, `notifications` | Comments, reactions, PRs and notifications on **upstream** repos. The org blocks classic PATs, so this token can't touch `open-macaron/*` |
+| `GH_INTERACT` | classic PAT of macaron-bot | `repo`, `notifications` | Comments, reactions, PRs and notifications on **upstream** repos. The org blocks classic PATs, so this token can't touch `open-macaron/*` |
 | `GH_PUSH` | fine-grained, owner `macaron-bot`, all repositories | Contents: write. Workflows: write | `git push` to forks (macaron-bot owns nothing else but its profile repository), including `macaron-bot/knowledge`, and media uploads (user-attachments) against the fork (`EvidenceHost`). Workflows only carries upstream's own workflow commits when a fork is synced or branched; the controller never writes `.github/` itself. No Administration permission. **Never enable Actions on a fork**: onboarding disables them explicitly (§5) |
 | `GH_ORG` | fine-grained, owner `open-macaron`, repositories `runner` and `knowledge`, approved by an org owner | `runner`: Actions read and write. `knowledge`: Pull requests read and write | Start and cancel runs; open and update the `remember:` proposals from `macaron-bot/knowledge` (the org blocks the classic `GH_INTERACT`). Artifacts use `GH_INTERACT` (public reads). A GitHub App could replace this token later, to avoid manual renewal |
 
