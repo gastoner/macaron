@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { PublishedLesson, RunKnowledge } from "@open-macaron/contracts";
+import type { PublishedLesson, PublishedRule, RunKnowledge } from "@open-macaron/contracts";
 
 /** Agent Skills names: lowercase letters, digits and single hyphens, at most 64 characters. */
 const MAX_NAME = 64;
@@ -20,6 +20,31 @@ export async function writeSkills(dir: string, knowledge: RunKnowledge): Promise
     await writeFile(join(skills, name, "SKILL.md"), skillFile(name, lesson, knowledge.commit));
   }
   return dir;
+}
+
+/** A rule of the run and the file holding its full text. */
+export interface RuleFile {
+  readonly rule: PublishedRule;
+  readonly path: string;
+}
+
+/**
+ * Writes the run's rules to `<dir>/rules/<name>.md`, next to the skills: outside the checkout too.
+ * Files rather than the prompt: a project's rules can weigh tens of kilobytes, and a change only
+ * touches some of them.
+ */
+export async function writeRules(dir: string, knowledge: RunKnowledge): Promise<readonly RuleFile[]> {
+  const rules = join(dir, "rules");
+  await rm(rules, { recursive: true, force: true });
+  await mkdir(rules, { recursive: true });
+  const taken = new Set<string>();
+  const files: RuleFile[] = [];
+  for (const rule of knowledge.rules) {
+    const path = join(rules, `${uniqueName(skillName(rule), taken)}.md`);
+    await writeFile(path, ruleFile(rule, knowledge.commit));
+    files.push({ rule, path });
+  }
+  return files;
 }
 
 /** `<scope>-<slug>`, e.g. `podman-desktop-windows-machines` or `axel7083-foobar-tmp-demo-building`. */
@@ -56,5 +81,16 @@ ${lesson.body.trim()}
 
 ---
 Lesson \`${lesson.id}\` from ${origin}, last verified ${lesson.lastVerified}, confidence ${lesson.confidence}. Sources: ${lesson.sources.join(", ")}
+`;
+}
+
+function ruleFile(rule: PublishedRule, commit: string | null): string {
+  const origin = commit === null ? "open-macaron/knowledge" : `open-macaron/knowledge@${commit.slice(0, 7)}`;
+  return `# ${rule.title}
+
+${rule.body.trim()}
+
+---
+Rule \`${rule.id}\` from ${origin}, severity ${rule.severity}. Sources: ${rule.sources.join(", ")}
 `;
 }

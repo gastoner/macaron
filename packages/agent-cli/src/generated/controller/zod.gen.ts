@@ -137,7 +137,21 @@ export const zBootstrapResponse = z.object({
                     'high'
                 ]),
                 body: z.string()
-            })).max(200)
-        }).default({ commit: null, lessons: [] })
+            })).max(200),
+            rules: z.array(z.object({
+                id: z.string().min(1),
+                scope: z.string().regex(/^(global|[a-z0-9]+(-[a-z0-9]+)*|[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100})$/),
+                title: z.string(),
+                severity: z.enum(['error', 'warning']),
+                appliesTo: z.array(z.string().min(1).max(200)).nullable(),
+                exclude: z.array(z.string().min(1).max(200)),
+                sources: z.array(z.url()),
+                body: z.string()
+            })).max(200).default([])
+        }).default({
+            commit: null,
+            lessons: [],
+            rules: []
+        })
     })
 });

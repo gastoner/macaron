@@ -63,12 +63,15 @@ export const ReviewContext = z.strictObject({
 export type ReviewContext = z.infer<typeof ReviewContext>;
 
 /**
- * The repository's lessons (global → project → repo) and the open-macaron/knowledge commit they come
- * from: the agent gets each as a skill, loaded when it matters.
+ * The repository's lessons and rules (global → project → repo) and the open-macaron/knowledge commit
+ * they come from: the agent gets each lesson as a skill, loaded when it matters, and in the modes that
+ * change code, each rule as a file to check its work against.
  */
 export const RunKnowledge = z.strictObject({
   commit: CommitSha.nullable(),
   lessons: z.array(PublishedLesson).max(200),
+  /** Absent from contexts of controllers that predate it. */
+  rules: z.array(PublishedRule).max(200).default([]),
 });
 export type RunKnowledge = z.infer<typeof RunKnowledge>;
 
@@ -99,7 +102,7 @@ export const RunContext = z.strictObject({
   /** The platforms this repository's runs can use: where a triage run may escalate to. */
   platforms: z.array(Platform).min(1).default(["linux"]),
   /** Empty for reviews (they get rules, in `review`) and in contexts from controllers that predate it. */
-  knowledge: RunKnowledge.default({ commit: null, lessons: [] }),
+  knowledge: RunKnowledge.default({ commit: null, lessons: [], rules: [] }),
 });
 export type RunContext = z.infer<typeof RunContext>;
 

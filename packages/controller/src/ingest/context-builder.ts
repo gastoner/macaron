@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { UpstreamError } from "../common/errors.ts";
 import {
+  allowedActions,
   GitHubLogin,
+  type Mode,
   platformsOf,
   type RepoConfig,
   type ReviewComment,
@@ -33,6 +35,7 @@ const ATTACHMENTS = { maxFiles: 20, maxFileBytes: 25_000_000, maxTotalBytes: 50_
 const MAX_COMMENTS = 100;
 /** RunKnowledge's limit: beyond it, skill descriptions alone would crowd the context. */
 const MAX_LESSONS = 200;
+const MAX_RULES = 200;
 
 /**
  * Builds `context.json`: exactly what the agent is told. Everything comes from GitHub at launch
@@ -90,22 +93,23 @@ export class ContextBuilder {
       review,
       platform: platformOf(route),
       platforms: platformsOf(config),
-      knowledge: review === undefined ? await this.lessons(config) : { commit: null, lessons: [] },
+      knowledge: review === undefined ? await this.knowledgeOf(config, mode) : { commit: null, lessons: [], rules: [] },
     });
   }
 
   /**
-   * The repository's lessons for a working run, at the knowledge commit they were read at. They help,
-   * they don't gate: a run starts without them when the knowledge site can't be read.
+   * The repository's lessons for a working run, and its rules when the run can change code, at the
+   * knowledge commit they were read at. They help, they don't gate: a run starts without them when the
+   * knowledge site can't be read.
    */
-  private async lessons(config: RepoConfig): Promise<RunKnowledge> {
+  private async knowledgeOf(config: RepoConfig, mode: Mode): Promise<RunKnowledge> {
     try {
-      const { commit, lessons } = await this.knowledge.knowledgeFor(config);
-      return { commit, lessons: lessons.slice(0, MAX_LESSONS) };
+      const { commit, lessons, rules } = await this.knowledge.knowledgeFor(config);
+      return { commit, lessons: lessons.slice(0, MAX_LESSONS), rules: rulesForMode(mode, rules) };
     } catch (error: unknown) {
       if (!(error instanceof UpstreamError)) throw error;
       this.logger.warn(`${config.repo}: running without lessons: ${error.message}`);
-      return { commit: null, lessons: [] };
+      return { commit: null, lessons: [], rules: [] };
     }
   }
 
@@ -160,6 +164,11 @@ export class ContextBuilder {
       createdAt: comment.created_at,
     }));
   }
+}
+
+/** The rules a run works by: only a mode that can change code has something to check against them. */
+export function rulesForMode<Rule>(mode: Mode, rules: readonly Rule[]): Rule[] {
+  return allowedActions[mode].includes("commit") ? rules.slice(0, MAX_RULES) : [];
 }
 
 function loginOf(login: string): GitHubLogin {

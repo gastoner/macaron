@@ -126,6 +126,16 @@ export type BootstrapResponses = {
                     confidence: 'low' | 'medium' | 'high';
                     body: string;
                 }>;
+                rules: Array<{
+                    id: string;
+                    scope: string;
+                    title: string;
+                    severity: 'error' | 'warning';
+                    appliesTo: Array<string> | null;
+                    exclude: Array<string>;
+                    sources: Array<string>;
+                    body: string;
+                }>;
             };
         };
     };

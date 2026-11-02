@@ -45,7 +45,7 @@ export interface Paths {
   readonly bootstrapFile: string;
   /** What the repository's environment leaves for the agent: optional `mcp.json` and `AGENTS.md`. */
   readonly environment: string;
-  /** The run's lessons as skills (`.claude/skills/`), given to the harness as an extra directory. */
+  /** The run's lessons as skills (`.claude/skills/`) and its rules (`rules/`), given to the harness as an extra directory. */
   readonly knowledge: string;
   /** What gets uploaded as the `macaron-result` artifact. */
   readonly out: string;
