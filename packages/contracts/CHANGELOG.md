@@ -1,5 +1,11 @@
 # @open-macaron/contracts
 
+## 0.9.0
+
+### Minor Changes
+
+- a71ccab: The web app's Overview page lists every configured project and repository, with whether each one finished onboarding (`GET /v1/projects`).
+
 ## 0.8.0
 
 ### Minor Changes
