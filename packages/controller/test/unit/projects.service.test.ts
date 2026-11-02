@@ -40,16 +40,29 @@ function withRepos(...repos: readonly RepoConfig[]): ConfigSnapshot {
 }
 
 describe("ProjectsService", () => {
-  it("lists every project by name, each repository by slug", async () => {
-    const { projects } = await service(snapshot, new MemoryForkStore()).list();
+  it("lists every repository, by project", async () => {
+    const { rows, nextCursor } = await service(snapshot, new MemoryForkStore()).page(100, undefined);
 
-    const names = projects.map((project) => project.name);
-    expect(names).toEqual([...snapshot.projects.keys()].sort((a, b) => a.localeCompare(b)));
-    expect(projects.flatMap((project) => project.repos)).toHaveLength(snapshot.repos.size);
-    for (const { repos } of projects) {
-      const slugs = repos.map(({ repo }) => repo);
-      expect(slugs).toEqual(slugs.toSorted((a, b) => a.localeCompare(b)));
+    expect(rows.filter((row) => row.repo !== null)).toHaveLength(snapshot.repos.size);
+    expect(new Set(rows.map((row) => row.project))).toEqual(new Set(snapshot.projects.keys()));
+    const seen = rows.map((row) => row.project).filter((project, index, all) => project !== all[index - 1]);
+    expect(seen).toHaveLength(snapshot.projects.size);
+    expect(nextCursor).toBeNull();
+  });
+
+  it("walks every row once, whatever the page size", async () => {
+    const list = service(snapshot, new MemoryForkStore());
+    const everything = (await list.page(100, undefined)).rows;
+    const walked = [];
+    let after: string | undefined;
+    for (;;) {
+      const { rows, nextCursor } = await list.page(2, after);
+      expect(rows.length).toBeLessThanOrEqual(2);
+      walked.push(...rows);
+      if (nextCursor === null) break;
+      after = nextCursor;
     }
+    expect(walked).toEqual(everything);
   });
 
   it("gives a repository its fork once ready, and none before", async () => {
@@ -57,35 +70,36 @@ describe("ProjectsService", () => {
     const store = new MemoryForkStore().ready(UPSTREAM, "abc123-foobar-tmp-demo");
     await store.record({ upstreamId: 99, upstreamKey: "org-x/not-ready", forkId: 199, forkName: "def456-not-ready" });
 
-    const { projects } = await service(withRepos(config, other), store).list();
+    const { rows } = await service(withRepos(config, other), store).page(100, undefined);
 
-    expect(projects.find((project) => project.name === config.project)?.repos).toEqual([
-      { repo: UPSTREAM, fork: "macaron-bot/abc123-foobar-tmp-demo" },
-      { repo: "org-x/not-ready", fork: null },
+    const listed = rows.filter((row) => row.repo !== null);
+    expect(listed).toEqual([
+      { project: config.project, repo: UPSTREAM, fork: "macaron-bot/abc123-foobar-tmp-demo" },
+      { project: config.project, repo: "org-x/not-ready", fork: null },
     ]);
   });
 
-  it("keeps a project without repositories", async () => {
-    const { projects } = await service(withRepos(), new MemoryForkStore()).list();
+  it("gives a project without repositories a row of its own", async () => {
+    const { rows } = await service(withRepos(), new MemoryForkStore()).page(100, undefined);
 
-    expect(projects).toHaveLength(snapshot.projects.size);
-    expect(projects.every((project) => project.repos.length === 0)).toBe(true);
+    expect(rows).toHaveLength(snapshot.projects.size);
+    expect(rows.every((row) => row.repo === null && row.fork === null)).toBe(true);
   });
 
   it("doesn't list a ready fork whose repository left the configuration", async () => {
     const store = new MemoryForkStore().ready("org-x/gone", "abc123-gone");
 
-    const { projects } = await service(withRepos(config), store).list();
+    const { rows } = await service(withRepos(config), store).page(100, undefined);
 
-    expect(projects.flatMap((project) => project.repos)).toEqual([{ repo: UPSTREAM, fork: null }]);
+    expect(rows.filter((row) => row.repo !== null)).toEqual([{ project: config.project, repo: UPSTREAM, fork: null }]);
   });
 
   it("matches a fork whatever the case of the configured name, and keeps that case", async () => {
     const mixed = { ...config, repo: RepoSlug.parse("Axel7083/Foobar-Tmp-Demo") };
     const store = new MemoryForkStore().ready(UPSTREAM, "abc123-foobar-tmp-demo");
 
-    const { projects } = await service(withRepos(mixed), store).list();
+    const { rows } = await service(withRepos(mixed), store).page(100, undefined);
 
-    expect(projects.flatMap((project) => project.repos)).toEqual([{ repo: "Axel7083/Foobar-Tmp-Demo", fork: "macaron-bot/abc123-foobar-tmp-demo" }]);
+    expect(rows.filter((row) => row.repo !== null)).toEqual([{ project: config.project, repo: "Axel7083/Foobar-Tmp-Demo", fork: "macaron-bot/abc123-foobar-tmp-demo" }]);
   });
 });

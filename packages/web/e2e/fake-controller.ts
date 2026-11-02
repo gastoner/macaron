@@ -44,6 +44,12 @@ type Refusal = z.infer<typeof zListRefusalsResponse>["refusals"][number];
 
 export const SESSION_COOKIE = "__Secure-macaron.session_token";
 const DAY = 86_400_000;
+/** One page and a bit of /v1/projects: a project without repositories, a repository not ready, then ready ones. */
+const PROJECT_ROWS: z.infer<typeof zListProjectsResponse>["rows"] = [
+  { project: "empty-project", repo: null, fork: null },
+  { project: "sandbox", repo: "open-macaron/sandbox-b", fork: null },
+  ...Array.from({ length: 28 }, (_, index) => ({ project: "sandbox", repo: `open-macaron/repo-${String(index)}`, fork: `macaron-bot/x1y2z3-repo-${String(index)}` })),
+];
 const ALL: User["capabilities"] = ["triage", "plan", "implement", "reproduce", "verify", "review", "remember"];
 
 interface State {
@@ -185,18 +191,11 @@ async function route(request: IncomingMessage): Promise<Reply> {
   }
   if (url.pathname === "/v1/projects") {
     if (state.projectsBroken) return reply(500, undefined, { error: "internal" });
-    return reply(200, zListProjectsResponse, {
-      projects: [
-        { name: "empty-project", repos: [] },
-        {
-          name: "sandbox",
-          repos: [
-            { repo: "open-macaron/sandbox-a", fork: "macaron-bot/x1y2z3-sandbox-a" },
-            { repo: "open-macaron/sandbox-b", fork: null },
-          ],
-        },
-      ],
-    });
+    const after = url.searchParams.get("after");
+    const start = after === null ? 0 : Number(after);
+    const limit = Number(url.searchParams.get("limit") ?? "25");
+    const end = start + limit;
+    return reply(200, zListProjectsResponse, { rows: PROJECT_ROWS.slice(start, end), nextCursor: end < PROJECT_ROWS.length ? String(end) : null });
   }
   if (url.pathname === "/v1/me/usage") {
     const limit = Number(url.searchParams.get("limit") ?? "25");

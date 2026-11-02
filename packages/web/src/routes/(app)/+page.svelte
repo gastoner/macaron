@@ -18,7 +18,6 @@
   import type { MyLlmKey } from "#lib/keys/forms.js";
   import { getMe, getUsage } from "./me.remote.ts";
   import { Progress } from "#lib/components/ui/progress/index.js";
-  import ProjectsCard from "./projects-card.svelte";
   import { getMonth, getMyKey } from "./settings/key/key.remote.ts";
 
   /** Why the bot can't run for this user now, or undefined when their key is usable. */
@@ -126,5 +125,3 @@
     </Empty.Root>
   {/snippet}
 </svelte:boundary>
-
-<ProjectsCard />

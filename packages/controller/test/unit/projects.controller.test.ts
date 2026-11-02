@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { Module } from "@nestjs/common";
+import { Module, StandardSchemaValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,13 +10,13 @@ import { ProjectsController } from "../../src/http/projects.controller.ts";
 import { ProjectsService } from "../../src/publish/projects.service.ts";
 
 const user = vi.fn<() => Promise<{ id: string }>>();
-const list = vi.fn<() => Promise<{ projects: never[] }>>();
+const page = vi.fn<(limit: number, after: string | undefined) => Promise<{ rows: never[]; nextCursor: null }>>();
 
 @Module({
   controllers: [ProjectsController],
   providers: [
     { provide: SessionsService, useValue: { user } },
-    { provide: ProjectsService, useValue: { list } },
+    { provide: ProjectsService, useValue: { page } },
   ],
 })
 class TestModule {}
@@ -27,7 +27,8 @@ describe("GET /v1/projects", () => {
 
   beforeAll(async () => {
     app = await NestFactory.create<NestExpressApplication>(TestModule, { logger: false });
-    // As main.ts: domain errors become their status.
+    // As main.ts: queries are validated with their defaults, domain errors become their status.
+    app.useGlobalPipes(new StandardSchemaValidationPipe({ transform: true }));
     app.useGlobalFilters(new DomainErrorFilter());
     await app.listen(0, "127.0.0.1");
     base = await app.getUrl();
@@ -45,15 +46,25 @@ describe("GET /v1/projects", () => {
     const response = await fetch(`${base}/v1/projects`);
 
     expect(response.status).toBe(401);
-    expect(list).not.toHaveBeenCalled();
+    expect(page).not.toHaveBeenCalled();
   });
 
-  it("lists the projects for any signed-in user", async () => {
+  it("serves a page to any signed-in user, 25 rows by default", async () => {
     user.mockResolvedValue({ id: "usr1" });
-    list.mockResolvedValue({ projects: [] });
+    page.mockResolvedValue({ rows: [], nextCursor: null });
 
     const response = await fetch(`${base}/v1/projects`);
 
-    expect(await response.json()).toEqual({ projects: [] });
+    expect(await response.json()).toEqual({ rows: [], nextCursor: null });
+    expect(page).toHaveBeenCalledWith(25, undefined);
+  });
+
+  it("refuses a page over the limit", async () => {
+    user.mockResolvedValue({ id: "usr1" });
+
+    const response = await fetch(`${base}/v1/projects?limit=101`);
+
+    expect(response.status).toBe(400);
+    expect(page).not.toHaveBeenCalled();
   });
 });
