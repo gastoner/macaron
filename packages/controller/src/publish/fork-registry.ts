@@ -28,6 +28,8 @@ export abstract class ForkStore {
   abstract byUpstream(upstreamId: number): Promise<ForkRow | undefined>;
   /** The fork's name, once ready, of the upstream configured as `key` (lower-cased `owner/name`). */
   abstract readyName(key: string): Promise<string | undefined>;
+  /** Every ready fork's name, keyed by upstream (lower-cased `owner/name`). */
+  abstract readyNames(): Promise<ReadonlyMap<string, string>>;
   /** Records the fork of an upstream, not ready; a row left by an upstream renamed since gives up its key. */
   abstract record(row: Omit<ForkRow, "readyAt">): Promise<void>;
   /** Marks the fork ready; true if it wasn't before. */
@@ -51,6 +53,11 @@ export class DrizzleForkStore extends ForkStore {
       .from(forks)
       .where(and(eq(forks.upstreamKey, key), isNotNull(forks.readyAt)));
     return row?.forkName;
+  }
+
+  override async readyNames(): Promise<ReadonlyMap<string, string>> {
+    const rows = await this.db.select({ upstreamKey: forks.upstreamKey, forkName: forks.forkName }).from(forks).where(isNotNull(forks.readyAt));
+    return new Map(rows.map((row) => [row.upstreamKey, row.forkName]));
   }
 
   override async record(row: Omit<ForkRow, "readyAt">): Promise<void> {
@@ -143,6 +150,12 @@ export class ForkRegistry implements OnApplicationBootstrap {
   async of(upstream: string): Promise<RepoRef | undefined> {
     const name = await this.store.readyName(repoKey(upstream));
     return name === undefined ? undefined : { owner: this.bot.identity.login, repo: name };
+  }
+
+  /** Every ready fork, keyed like the configuration's repositories: one query, for listing them. */
+  async readyForks(): Promise<ReadonlyMap<string, RepoRef>> {
+    const names = await this.store.readyNames();
+    return new Map([...names].map(([key, repo]) => [key, { owner: this.bot.identity.login, repo }]));
   }
 
   /** Like `of`, for steps that only run after a fork was found ready (publishing a run's result). */

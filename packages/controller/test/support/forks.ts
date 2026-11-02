@@ -21,6 +21,10 @@ export class MemoryForkStore extends ForkStore {
     return Promise.resolve([...this.rows.values()].find((row) => row.upstreamKey === key && row.readyAt !== null)?.forkName);
   }
 
+  override readyNames(): Promise<ReadonlyMap<string, string>> {
+    return Promise.resolve(new Map([...this.rows.values()].filter((row) => row.readyAt !== null).map((row) => [row.upstreamKey, row.forkName])));
+  }
+
   override record(row: Omit<ForkRow, "readyAt">): Promise<void> {
     for (const [id, other] of this.rows) if (other.upstreamKey === row.upstreamKey && id !== row.upstreamId) this.rows.delete(id);
     this.rows.set(row.upstreamId, { ...row, readyAt: this.rows.get(row.upstreamId)?.readyAt ?? null });
