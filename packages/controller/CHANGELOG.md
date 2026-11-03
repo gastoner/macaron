@@ -1,5 +1,11 @@
 # @open-macaron/controller
 
+## 0.14.0
+
+### Minor Changes
+
+- 5988311: The bot's answers name the model of their run: in the compact footer, the review's footer and the status comment's header.
+
 ## 0.13.0
 
 ### Minor Changes
