@@ -235,6 +235,8 @@ Signing in on a developer machine uses the same code as production: no dev-only 
    You sign in as an admin. Saving a key checks it with its endpoint, as in production. No run starts locally: mentions aren't polled.
 5. **Tear down:** `podman rm -f macaron-web-dev-postgres` (the database is gone with it) and `deploy/bifrost/dev.sh down`.
 
+**Screens only:** `pnpm --filter @open-macaron/web dev:fake` runs the dev server against the end-to-end tests' fake controller (`packages/web/e2e/fake-controller.ts`), with no GitHub App, database or Bifrost. Open `https://localhost:5173/api/auth/__dev-sign-in?as=defunkt` (or `as=octocat`, an admin) to be signed in as one of its users. That route exists only in the fake controller.
+
 ## 10. Bumping the web app's framework
 
 The web app relies on two experimental features: SvelteKit's remote functions (`experimental.remoteFunctions`) and Svelte's `await` in components (`compilerOptions.experimental.async`). A minor release may change them. #69 tracks them until they stabilise. A bump of `@sveltejs/kit`, `svelte` or `@sveltejs/vite-plugin-svelte` goes in its own PR:
