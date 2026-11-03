@@ -66,6 +66,8 @@ interface State {
   /** Everyone's, newest first: what /v1/admin/runs lists. */
   adminRuns: AdminRun[];
   refusals: Refusal[];
+  /** By user id: when each closed the onboarding. /__forget-onboarding removes one. */
+  onboarded: Map<string, string>;
   /** Set by /__break-projects: /v1/projects answers 500. */
   projectsBroken: boolean;
   /** Session renewals the browser asked for (through the edge), counted for the session test. */
@@ -124,7 +126,7 @@ function fresh(): State {
     { id: randomUUID(), repo: "open-macaron/sandbox", number: 11, kind: "issue", author: "defunkt", authorId: 2, url: "https://github.com/open-macaron/sandbox/issues/11#issuecomment-1", reason: "@defunkt may not ask for implement: an admin grants it on the Users page", createdAt: at(-0.2) },
     { id: randomUUID(), repo: "open-macaron/macaron", number: 12, kind: "pull", author: "octocat", authorId: 583231, url: "https://github.com/open-macaron/macaron/pull/12#issuecomment-2", reason: null, createdAt: at(-3) },
   ];
-  return { users, invitations, endpoints, keys: new Map(), keyEvents: new Map(), caps: new Map(), runs, adminRuns, refusals, projectsBroken: false, renewals: 0 };
+  return { users, invitations, endpoints, keys: new Map(), keyEvents: new Map(), caps: new Map(), runs, adminRuns, refusals, onboarded: new Map(users.map((user) => [user.id, user.createdAt])), projectsBroken: false, renewals: 0 };
 }
 
 let state = fresh();
@@ -155,6 +157,13 @@ function signedIn(request: IncomingMessage): User | undefined {
 
 const sessionCookie = (value: string, maxAge: number): string => `${SESSION_COOKIE}=${value}; Max-Age=${String(maxAge)}; Path=/; HttpOnly; Secure; SameSite=Lax`;
 
+/** The user named by `login` hasn't closed the onboarding anymore. */
+function forgetOnboarding(login: string | null): User | undefined {
+  const user = state.users.find((candidate) => candidate.githubLogin === login);
+  if (user !== undefined) state.onboarded.delete(user.id);
+  return user;
+}
+
 async function route(request: IncomingMessage): Promise<Reply> {
   const url = new URL(request.url ?? "/", "http://fake");
   const method = request.method ?? "GET";
@@ -167,12 +176,17 @@ async function route(request: IncomingMessage): Promise<Reply> {
     return reply(200, undefined, { broken: true });
   }
   if (url.pathname === "/__renewals") return reply(200, undefined, { renewals: state.renewals });
+  if (method === "POST" && url.pathname === "/__forget-onboarding") {
+    forgetOnboarding(url.searchParams.get("as"));
+    return reply(200, undefined, { forgotten: true });
+  }
 
   // For `pnpm dev:fake` only: the dev server proxies /api/auth here, so this sets the session cookie
   // on its origin. `as` names a fake user.
   if (url.pathname === "/api/auth/__dev-sign-in") {
-    const as = state.users.find((candidate) => candidate.githubLogin === url.searchParams.get("as"))?.githubLogin ?? "defunkt";
-    return reply(302, undefined, undefined, { "set-cookie": sessionCookie(as, 604_800), location: "/?welcome" });
+    // Signed in afresh: the onboarding opens, as at a first sign-in.
+    const as = forgetOnboarding(url.searchParams.get("as") ?? "defunkt")?.githubLogin ?? "defunkt";
+    return reply(302, undefined, undefined, { "set-cookie": sessionCookie(as, 604_800), location: "/" });
   }
 
   const user = signedIn(request);
@@ -194,7 +208,11 @@ async function route(request: IncomingMessage): Promise<Reply> {
 
   if (user === undefined) return reply(401, undefined, { error: "sign_in_required" });
   if (url.pathname === "/v1/me") {
-    return reply(200, zGetMeResponse, { githubId: user.githubId, githubLogin: user.githubLogin, name: user.name, avatarUrl: user.avatarUrl, role: user.role, capabilities: user.capabilities, onboardedAt: user.createdAt });
+    return reply(200, zGetMeResponse, { githubId: user.githubId, githubLogin: user.githubLogin, name: user.name, avatarUrl: user.avatarUrl, role: user.role, capabilities: user.capabilities, onboardedAt: state.onboarded.get(user.id) ?? null });
+  }
+  if (method === "PUT" && url.pathname === "/v1/me/onboarding") {
+    if (!state.onboarded.has(user.id)) state.onboarded.set(user.id, new Date().toISOString());
+    return reply(204, undefined, undefined);
   }
   if (url.pathname === "/v1/projects") {
     if (state.projectsBroken) return reply(500, undefined, { error: "internal" });
