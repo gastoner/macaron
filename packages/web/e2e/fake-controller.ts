@@ -168,6 +168,13 @@ async function route(request: IncomingMessage): Promise<Reply> {
   }
   if (url.pathname === "/__renewals") return reply(200, undefined, { renewals: state.renewals });
 
+  // For `pnpm dev:fake` only: the dev server proxies /api/auth here, so this sets the session cookie
+  // on its origin. `as` names a fake user.
+  if (url.pathname === "/api/auth/__dev-sign-in") {
+    const as = state.users.find((candidate) => candidate.githubLogin === url.searchParams.get("as"))?.githubLogin ?? "defunkt";
+    return reply(302, undefined, undefined, { "set-cookie": sessionCookie(as, 604_800), location: "/?welcome" });
+  }
+
   const user = signedIn(request);
   if (url.pathname === "/api/auth/get-session") {
     if (user === undefined) return reply(200, undefined, null);
