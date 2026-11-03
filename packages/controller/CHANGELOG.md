@@ -1,5 +1,11 @@
 # @open-macaron/controller
 
+## 0.12.0
+
+### Minor Changes
+
+- b4e12f4: OpenRouter is removed: Bifrost is the only LLM gateway, and its variables (`BIFROST_ADMIN_URL`, `BIFROST_PUBLIC_URL`, `BIFROST_ADMIN_PASSWORD`, `LLM_PRICING_FILE`) are required. `LLM_BACKEND` and the `OPENROUTER_*` variables are gone (a leftover value is ignored), and a migration drops `runs.key_backend`.
+
 ## 0.11.0
 
 ### Minor Changes
