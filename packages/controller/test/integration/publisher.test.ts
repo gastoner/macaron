@@ -156,7 +156,7 @@ describe("Publisher in compact mode", () => {
         "Reproduced on Linux: the editor crashes on start.",
         "",
         "---",
-        `<sub>macaron-bot · loop 1 · \`reproduce\` · runner \`ubuntu-24.04\` · [run ${String(run.ghRunId)}](${RUN_URL})</sub>`,
+        `<sub>macaron-bot · loop 1 · \`reproduce\` · runner \`ubuntu-24.04\` · model \`claude-sonnet-5.5\` · [run ${String(run.ghRunId)}](${RUN_URL})</sub>`,
         "<sub>Spent on this thread: $0.00 ⏳.</sub>",
       ].join("\n"),
     ]);
@@ -201,12 +201,12 @@ describe("Publisher with status comments", () => {
     const config = repoConfig(false);
 
     await publisher.reportStarted(thread, run, RUN_URL, config);
-    expect(writer.bodies()).toEqual([`**macaron-bot** · loop 1 · \`reproduce\` · [run](${RUN_URL})\n\n⏳ Working on it.\n\n<sub>Spent on this thread: $0.00 ⏳.</sub>`]);
+    expect(writer.bodies()).toEqual([`**macaron-bot** · loop 1 · \`reproduce\` · model \`claude-sonnet-5.5\` · [run](${RUN_URL})\n\n⏳ Working on it.\n\n<sub>Spent on this thread: $0.00 ⏳.</sub>`]);
 
     await publisher.publish({ run, thread, config, publishable: publishable(), runUrl: RUN_URL });
 
     expect(writer.bodies()).toEqual([
-      `**macaron-bot** · loop 1 · \`reproduce\` · [run](${RUN_URL})\n\n✅ Reproduced the crash.\n\n<sub>Spent on this thread: $0.00 ⏳.</sub>`,
+      `**macaron-bot** · loop 1 · \`reproduce\` · model \`claude-sonnet-5.5\` · [run](${RUN_URL})\n\n✅ Reproduced the crash.\n\n<sub>Spent on this thread: $0.00 ⏳.</sub>`,
       "Reproduced on Linux: the editor crashes on start.",
     ]);
   });

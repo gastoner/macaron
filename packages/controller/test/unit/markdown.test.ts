@@ -80,30 +80,30 @@ const lesson = PublishedLesson.parse({
 });
 
 describe("status header", () => {
-  it("names the mode, and nothing else a Linux run without lessons has", () => {
-    expect(statusHeader({ loop: 1, mode: "plan", platform: "linux", runUrl: null, knowledge: none })).toBe("**macaron-bot** · loop 1 · `plan`");
+  it("names the mode and the model, and nothing else a Linux run without lessons has", () => {
+    expect(statusHeader({ loop: 1, mode: "plan", platform: "linux", model: "claude-sonnet-5-5", runUrl: null, knowledge: none })).toBe("**macaron-bot** · loop 1 · `plan` · model `claude-sonnet-5-5`");
   });
 
   it("names another platform and the lessons the run was given, with their commit", () => {
     const commit = CommitSha.parse("abcdef1".padEnd(40, "0"));
-    expect(statusHeader({ loop: 2, mode: "reproduce", platform: "windows", runUrl: "https://example.org/run", knowledge: { commit, lessons: [lesson] } })).toBe(
-      `**macaron-bot** · loop 2 · \`reproduce\` · Windows · [run](https://example.org/run) · 1 lesson from [open-macaron/knowledge@abcdef1](https://github.com/open-macaron/knowledge/tree/${commit})`,
+    expect(statusHeader({ loop: 2, mode: "reproduce", platform: "windows", model: "anthropic/claude-opus-5-5", runUrl: "https://example.org/run", knowledge: { commit, lessons: [lesson] } })).toBe(
+      `**macaron-bot** · loop 2 · \`reproduce\` · Windows · model \`claude-opus-5-5\` · [run](https://example.org/run) · 1 lesson from [open-macaron/knowledge@abcdef1](https://github.com/open-macaron/knowledge/tree/${commit})`,
     );
   });
 });
 
 describe("runFooter", () => {
-  it("names the runner and the run by its id, says where work continues, and keeps the spent line replaceable", () => {
+  it("names the runner, the model and the run by its id, says where work continues, and keeps the spent line replaceable", () => {
     const commit = CommitSha.parse("abcdef1".padEnd(40, "0"));
     const footer = runFooter(
-      { loop: 2, mode: "reproduce", platform: "windows", runUrl: "https://example.org/run/9", knowledge: { commit, lessons: [lesson] }, runner: "windows-2025", ghRunId: 9 },
+      { loop: 2, mode: "reproduce", platform: "windows", model: "anthropic/claude-opus-5-5", runUrl: "https://example.org/run/9", knowledge: { commit, lessons: [lesson] }, runner: "windows-2025", ghRunId: 9 },
       "Work continues in #42.",
       spentLine(0, true),
     );
     expect(footer).toBe(
       [
         "---",
-        `<sub>macaron-bot · loop 2 · \`reproduce\` · runner \`windows-2025\` · [run 9](https://example.org/run/9) · 1 lesson from [open-macaron/knowledge@abcdef1](https://github.com/open-macaron/knowledge/tree/${commit})</sub>`,
+        `<sub>macaron-bot · loop 2 · \`reproduce\` · runner \`windows-2025\` · model \`claude-opus-5-5\` · [run 9](https://example.org/run/9) · 1 lesson from [open-macaron/knowledge@abcdef1](https://github.com/open-macaron/knowledge/tree/${commit})</sub>`,
         "Work continues in #42.",
         "<sub>Spent on this thread: $0.00 ⏳.</sub>",
       ].join("\n"),
@@ -112,8 +112,8 @@ describe("runFooter", () => {
   });
 
   it("leaves out what a run doesn't have", () => {
-    expect(runFooter({ loop: 1, mode: "plan", platform: "linux", runUrl: null, knowledge: none, runner: undefined, ghRunId: null }, "", spentLine(0, false))).toBe(
-      "---\n<sub>macaron-bot · loop 1 · `plan`</sub>\n<sub>Spent on this thread: $0.00.</sub>",
+    expect(runFooter({ loop: 1, mode: "plan", platform: "linux", model: "claude-sonnet-5-5", runUrl: null, knowledge: none, runner: undefined, ghRunId: null }, "", spentLine(0, false))).toBe(
+      "---\n<sub>macaron-bot · loop 1 · `plan` · model `claude-sonnet-5-5`</sub>\n<sub>Spent on this thread: $0.00.</sub>",
     );
   });
 });

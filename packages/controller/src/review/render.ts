@@ -1,19 +1,20 @@
 import { type InlineComment, renderMarkdown, type ReviewMeta, type RuleResult } from "@open-macaron/review";
 import { formatUsd, type UsdMicros } from "../common/money.ts";
-import { sanitize } from "../publish/markdown.ts";
+import { modelName, sanitize } from "../publish/markdown.ts";
 
 const COST_START = "<!-- macaron:review-cost -->";
 const COST_END = "<!-- /macaron:review-cost -->";
 
 /**
  * The bot's GitHub review: the shared rendering (@open-macaron/review), with the reviewer's text
- * defused (mentions) and the bot's footer: the cost (⏳ until settled), the loop, the runner and the run.
+ * defused (mentions) and the bot's footer: the cost (⏳ until settled), the loop, the runner, the model and the run.
  */
 export function renderReview(
   results: readonly RuleResult[],
   meta: ReviewMeta & {
     readonly loop: number;
     readonly runner: string | undefined;
+    readonly model: string;
     readonly ghRunId: number | null;
     readonly runUrl: string | null;
     readonly costMicros: UsdMicros | null;
@@ -21,6 +22,7 @@ export function renderReview(
 ): { body: string; comments: InlineComment[] } {
   const parts = [renderReviewCost(meta.costMicros), `loop ${String(meta.loop)}`];
   if (meta.runner !== undefined) parts.push(`runner \`${meta.runner}\``);
+  parts.push(`model \`${modelName(meta.model)}\``);
   if (meta.runUrl !== null) parts.push(`[run${meta.ghRunId === null ? "" : ` ${String(meta.ghRunId)}`}](${meta.runUrl})`);
   return renderMarkdown(results, meta, { clean: (text) => sanitize(text, new Set()), footer: parts.join(" · ") });
 }
