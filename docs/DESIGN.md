@@ -36,7 +36,7 @@ flowchart LR
   subgraph GHA["GitHub Actions: open-macaron/runner"]
     RUN["run.yml (1 job, no secrets)<br/>clone → env → bootstrap → harness<br/>artifact: patch + result"]
   end
-  OR[("LLM backend<br/>OpenRouter, or Bifrost → upstream<br/>keys, usage $")]
+  OR[("LLM gateway<br/>Bifrost → the payer's upstream<br/>keys, usage $")]
 
   ING -- "poll notifications" --> UP
   UP -. "webhook (planned, upstream admin)" .-> ING
@@ -73,7 +73,7 @@ sequenceDiagram
   box rgb(230,245,230) Controller on OpenShift (trusted, all secrets)
     participant C as Controller
   end
-  participant OR as LLM backend (OpenRouter or Bifrost)
+  participant OR as LLM gateway (Bifrost)
   box rgb(250,230,230) GitHub Actions job: agent (permissions: id-token write only)
     participant J as run.yml
   end
@@ -95,7 +95,7 @@ sequenceDiagram
   end
   J->>J: upload artifact: changes.patch + result.json
   J-->>C: webhook: workflow_run completed
-  C->>OR: disable key now (spending stops); settle-cost job after the backend's usage lag (15 s Bifrost, 90 s OpenRouter): final usage → ledger → delete key
+  C->>OR: disable key now (spending stops); settle-cost job after Bifrost's usage lag (15 s): final usage → ledger → delete key
   C->>C: download artifact → Gate (policy)
   Note over C: Publisher: commit, FF push, replies, cost table, 👀 → 👍/😕
 ```
@@ -103,7 +103,7 @@ sequenceDiagram
 - The OIDC check requires `repository_id` and `repository_owner_id` (immutable), of `open-macaron/runner`, `workflow_ref=open-macaron/runner/.github/workflows/run.yml@refs/heads/main`, `event_name=workflow_dispatch`, `actor=macaron-bot` and `runner_environment=github-hosted`: a runner label in the configuration can't send a key to a machine we don't control.
 - A ticket can be redeemed only once. The legitimate bootstrap step uses it before the agent starts, so an agent that mints its own OIDC token gets nothing. The environment step runs *before* bootstrap. If environment code redeems the ticket first, the real bootstrap gets a 409 and the controller revokes the key at once: at worst a failed run, never a leaked credential.
 - The agent job has no endpoint for submitting results. The controller *pulls* the artifact.
-- **With the Bifrost backend, a credential-holding service runs next to the controller.** For the length of each run, Bifrost holds the payer's own LLM key, which has no cap of its own and can't derive keys; the run's virtual key may use that key alone (`key_ids`), and it is removed from Bifrost when the run stops spending. Runners reach it only through three exact edge routes (messages, token counting, model list), each forwarded to its canonical path; its admin API and UI are reachable only from the controller (NetworkPolicy). Its configuration file is authoritative over its database at every start, auth is enforced on inference, and stored keys are encrypted. Anyone holding the admin password can still change settings until the next restart, so that password exists only in the controller and Bifrost.
+- **A credential-holding service, Bifrost, runs next to the controller.** For the length of each run, Bifrost holds the payer's own LLM key, which has no cap of its own and can't derive keys; the run's virtual key may use that key alone (`key_ids`), and it is removed from Bifrost when the run stops spending. Runners reach it only through three exact edge routes (messages, token counting, model list), each forwarded to its canonical path; its admin API and UI are reachable only from the controller (NetworkPolicy). Its configuration file is authoritative over its database at every start, auth is enforced on inference, and stored keys are encrypted. Anyone holding the admin password can still change settings until the next restart, so that password exists only in the controller and Bifrost.
 
 ## 4. Components (`packages/controller/`, NestJS — module map in ENGINEERING.md §3)
 
@@ -220,12 +220,11 @@ Latency is therefore *at least* one poll interval (typically ~60 s, more when Gi
 ### Budgets (`BudgetModule`)
 
 ```ts
-/** One per configured backend (OpenRouterKeys, BifrostKeys); LLM_BACKEND picks the one new runs use. */
+/** The port BudgetService sees; BifrostKeys implements it (tests use fakes). */
 abstract class RunKeys {
-  readonly backend: "openrouter" | "bifrost";
   readonly baseUrl: string;      // what runners use as ANTHROPIC_BASE_URL
   readonly usageLagMs: number;   // wait after freezing before usage is worth reading
-  /** Over `upstream`, the payer's endpoint and key (OpenRouter refuses: it can't bill a user's key). */
+  /** Over `upstream`, the payer's endpoint and key. */
   create(name: string, limitUsd: number, expiresAt: Date, models: readonly string[], upstream: Upstream): Promise<ProvisionedKey>;
   disable(hash: string): Promise<void>;   // Bifrost: the user's key leaves at once
   /** Users' keys left by an interrupted mint, except those `keep` names. */
@@ -236,26 +235,24 @@ abstract class RunKeys {
 }
 
 class BudgetService {
-  /** On the active backend: capped at limitUsd, limited to `models` where the backend can, expiring after ttlMinutes. */
+  /** Capped at limitUsd, limited to `models`, expiring after ttlMinutes. */
   mint(runId: string, limitUsd: number, ttlMinutes: number, models: readonly string[], upstream: Upstream): Promise<MintedKey>;
-  /** Every other call goes to the backend recorded on the run (`runs.key_backend`), whichever is active now. */
   freeze(key: RunKeyRef): Promise<void>;
   usage(key: RunKeyRef, since: Date): Promise<UsdMicros>;
   revoke(key: RunKeyRef): Promise<void>;
-  /** Run keys on every configured backend, for the sweeper. */
-  runKeys(): Promise<SweepableKey[]>;
+  /** Every run key, for the sweeper. */
+  runKeys(): Promise<KeyStatus[]>;
 }
 ```
 
-- **Two backends.** OpenRouter mints real keys with a limit and an expiry. Bifrost (a self-hosted gateway, `deploy/openshift/bifrost.yaml`) mints virtual keys with a budget, an expiry, an allowlist of the run's model and fast model, and a per-minute request limit, over the payer's own key: each approved endpoint is a Bifrost provider priced from the pinned list, and the payer's key is added to it for the run only. OpenRouter can't bill a user's key: with it active, runs are refused. Each run records where its key was minted, so switching `LLM_BACKEND` never strands a run's key.
-- **Start-up checks.** Each configured backend checks itself when the controller starts (OpenRouter resolves its workspace, `OPENROUTER_WORKSPACE`; Bifrost checks its admin credentials, and its prices come from `LLM_PRICING_FILE`). The active backend must pass, and must price every model the configuration uses; another backend that fails is logged and left out, since it only matters for runs minted on it.
-- **OpenRouter keys live in one workspace,** so its dashboard is the bot's total spend there, and a workspace budget can act as a hard global ceiling on top of our caps.
-- **Costs are settled in two phases.** Backends report a key's usage asynchronously (OpenRouter ~25 s after the call; Bifrost writes spend every 10 s). At completion the key is frozen and the result is published immediately. A `settle-cost` job runs after the backend's `usageLagMs` (90 s for OpenRouter, 15 s for Bifrost), writes the final cost to the ledger once, deletes the key and refreshes the PR's cost table, where the loop shows "settling…" until then. A run's whole limit counts against the caps until it is settled, so nothing can overshoot in between.
+- **One gateway.** Bifrost (a self-hosted gateway, `deploy/openshift/bifrost.yaml`) mints virtual keys with a budget, an expiry, an allowlist of the run's model and fast model, and a per-minute request limit, over the payer's own key: each approved endpoint is a Bifrost provider priced from the pinned list, and the payer's key is added to it for the run only.
+- **Start-up checks.** Bifrost's admin credentials are checked when the controller starts, and its prices come from `LLM_PRICING_FILE`: every model the configuration uses must be priced.
+- **Costs are settled in two phases.** Bifrost reports a key's usage asynchronously (it writes spend every 10 s). At completion the key is frozen and the result is published immediately. A `settle-cost` job runs after `usageLagMs` (15 s), writes the final cost to the ledger once, deletes the key and refreshes the PR's cost table, where the loop shows "settling…" until then. A run's whole limit counts against the caps until it is settled, so nothing can overshoot in between.
 
 - Caps exist at six levels: per-run key limit, per thread, per repo per month, per project per month, each user's own monthly cap on their key, and global concurrency. There is also a kill switch (`MACARON_ENABLED`): no polling, no new run; runs already going finish.
 - Every run key expires on its own (`expires_at` = timeout + 15 min). A `sweep-keys` pg-boss cron job deletes leftovers, as a safety net: keys of unsettled runs are kept until they are older than the longest allowed run plus grace and settlement (`KEY_MAX_AGE_MS`, derived from `MAX_TIMEOUT_MINUTES`). Each run's fast model is stored at launch with its model, since its key allows only those two.
-- The last request can overshoot a key's limit a little, so harness `max_tokens` stays bounded. OpenRouter refuses a request whose worst case exceeds what's left. Bifrost checks the budget before a request and charges it after, with no reservation, so parallel requests can each overshoot; its per-key request limit is counted the same way and doesn't stop a burst. The bound is Bifrost's per-provider cap, one provider per endpoint: 16 requests in flight plus 16 queued, the rest dropped (measured: a burst of 40 ran 32).
-- **Bifrost only charges priced models.** A model without a price costs $0, so its budget would never trigger. Prices are pinned in `deploy/bifrost/pricing.json` for exactly the allowed models, the controller refuses to start when the active backend can't price a configured model (e.g. names written for the other backend), or to apply a reloaded configuration, and `BifrostKeys` still refuses to mint a key for a model without one.
+- The last request can overshoot a key's limit a little, so harness `max_tokens` stays bounded. Bifrost checks the budget before a request and charges it after, with no reservation, so parallel requests can each overshoot; its per-key request limit is counted the same way and doesn't stop a burst. The bound is Bifrost's per-provider cap, one provider per endpoint: 16 requests in flight plus 16 queued, the rest dropped (measured: a burst of 40 ran 32).
+- **Bifrost only charges priced models.** A model without a price costs $0, so its budget would never trigger. Prices are pinned in `deploy/bifrost/pricing.json` for exactly the allowed models, the controller refuses to start when Bifrost can't price a configured model, or to apply a reloaded configuration, and `BifrostKeys` still refuses to mint a key for a model without one.
 
 ### Gate and Publisher (`PublishModule`)
 
@@ -285,7 +282,7 @@ The controller has three GitHub tokens, all in its own Kubernetes Secret. Exact 
 
 ### Harness contract (`packages/agent-cli/src/harness.ts`, `packages/contracts`)
 
-For Claude Code the adapter sets `ANTHROPIC_BASE_URL=<llm.baseUrl>` (OpenRouter's `https://openrouter.ai/api`, or the edge's `/llm/anthropic` route to Bifrost), `ANTHROPIC_AUTH_TOKEN=<llm.key>`, `ANTHROPIC_API_KEY=""`, and the Haiku slot to `llm.fastModel`.
+For Claude Code the adapter sets `ANTHROPIC_BASE_URL=<llm.baseUrl>` (the edge's `/llm/anthropic` route to Bifrost), `ANTHROPIC_AUTH_TOKEN=<llm.key>`, `ANTHROPIC_API_KEY=""`, and the Haiku slot to `llm.fastModel`.
 
 ```ts
 // Abridged; the schemas are packages/contracts/src/run.ts (emitted as run-context/run-result.schema.json).
@@ -620,7 +617,7 @@ All `open-macaron` repos, the `runner` Actions logs, the images and the knowledg
 
 ## 8. Decisions
 
-1. **Ingress (decided).** The OpenShift router terminates TLS; nginx (`deploy/openshift/edge/`) exposes only `/v1/webhook`, `/v1/bootstrap` and, with the Bifrost backend, three exact `/llm/anthropic/v1/…` routes.
+1. **Ingress (decided).** The OpenShift router terminates TLS; nginx (`deploy/openshift/edge/`) exposes only `/v1/webhook`, `/v1/bootstrap` and Bifrost's three exact `/llm/anthropic/v1/…` routes.
 2. **Ledger storage (decided).** PostgreSQL 18 (a StatefulSet next to the controller, TLS only), with Drizzle ORM. See DEPLOYMENT.md §2.
 3. **Stack (decided).** NestJS 12 (ESM), TypeScript 6 strict, Drizzle v1 via `@nestjs/drizzle`, Zod, Vitest. See ENGINEERING.md.
 4. **Triggers (decided).** The trigger is a **mention**: `@macaron-bot [plan|implement|reproduce|verify|stop|retry|…]` from someone with an account. The bot never gets access to upstream repos, so no trigger is built on assignment, review requests or labels. GitHub lets a maintainer assign the bot only after it has commented on that issue; that rare case is handled like a bare mention, with the assigner checked like any other mention.
@@ -628,7 +625,7 @@ All `open-macaron` repos, the `runner` Actions logs, the images and the knowledg
 6. **Hosting (decided 2026-10-21):** an OpenShift namespace, applied from an operator machine (no GitOps, no credential in GitHub). It replaced a Fedora VPS with Podman quadlets (decided 2026-10-15), migrated in #24. Still open: see DEPLOYMENT.md §7.
 7. **Organisation (decided 2026-10-15):** `open-macaron` owns `macaron`, `config`, `runner`, `knowledge` and `.github`; the user `macaron-bot` owns only forks. See REPOSITORIES.md.
 8. **Knowledge approval (decided 2026-10-15):** Prow-style. Per-folder `OWNERS.yaml` matched by user id; folder owners need no write access; `merge.yml` (on `main`, triggered by reviews, trusting nothing from the triggering run) merges with the repository's own token. No upstream-provided rules for now. See §6.4.
-9. **LLM backend (decided 2026-10-19):** Bifrost (Apache 2.0, ~200 MB) mints per-run keys over an LLM key that can't derive keys: since 2026-10-23, the payer's own (users' keys, docs/USER-KEYS.md), never a shared one. LiteLLM was rejected for its weight. A live spike verified Claude Code through Bifrost with raw pass-through and spend matching Claude Code's own cost. Production runs on Bifrost only: OpenRouter's keys are disabled and it isn't configured, though the code still supports it.
+9. **LLM backend (decided 2026-10-19):** Bifrost (Apache 2.0, ~200 MB) mints per-run keys over an LLM key that can't derive keys: since 2026-10-23, the payer's own (users' keys, docs/USER-KEYS.md), never a shared one. LiteLLM was rejected for its weight. A live spike verified Claude Code through Bifrost with raw pass-through and spend matching Claude Code's own cost. OpenRouter, the first backend, was removed on 2026-11-03: it can't bill a user's key.
 
 ## 9. Milestones
 
