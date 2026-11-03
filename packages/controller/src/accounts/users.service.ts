@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectDrizzle } from "@nestjs/drizzle";
 import { type Capability, GitHubLogin, type UserAccount } from "@open-macaron/contracts";
-import { asc, eq, max } from "drizzle-orm";
+import { and, asc, eq, isNull, max, sql } from "drizzle-orm";
 import { FieldRefused } from "../common/errors.ts";
 import type { Db } from "../db/db.module.ts";
 import { adminAudit, sessions, users } from "../db/schema.ts";
@@ -40,6 +40,17 @@ export class UsersService {
   async get(id: string): Promise<UserAccount | undefined> {
     const [row] = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
     return row === undefined ? undefined : toAccount(row, null);
+  }
+
+  /** When the user closed the web app's onboarding; null until then, or without such a user. */
+  async onboardedAt(id: string): Promise<Date | null> {
+    const [row] = await this.db.select({ onboardedAt: users.onboardedAt }).from(users).where(eq(users.id, id)).limit(1);
+    return row?.onboardedAt ?? null;
+  }
+
+  /** Records that the user closed the onboarding; keeps the first time. */
+  async completeOnboarding(id: string): Promise<void> {
+    await this.db.update(users).set({ onboardedAt: sql`now()` }).where(and(eq(users.id, id), isNull(users.onboardedAt)));
   }
 
   async list(): Promise<UserAccount[]> {

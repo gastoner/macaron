@@ -49,7 +49,18 @@ export class MeController {
     const user = await this.sessions.user(request.headers);
     const account = await this.users.get(user.id);
     if (account === undefined) throw new SignInRequired("the session's user no longer exists");
-    return { githubId: user.githubId, githubLogin: GitHubLogin.parse(user.githubLogin), name: user.name, avatarUrl: user.image, role: user.role, capabilities: account.capabilities };
+    const onboardedAt = await this.users.onboardedAt(user.id);
+    return { githubId: user.githubId, githubLogin: GitHubLogin.parse(user.githubLogin), name: user.name, avatarUrl: user.image, role: user.role, capabilities: account.capabilities, onboardedAt: onboardedAt?.toISOString() ?? null };
+  }
+
+  @Put("onboarding")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ operationId: "completeMyOnboarding", summary: "Record that the signed-in user closed the onboarding; the first time is kept" })
+  @ApiResponse({ status: 204, description: "Recorded" })
+  @ApiResponse({ status: 401, description: "No valid session" })
+  async completeOnboarding(@Req() request: Request): Promise<void> {
+    const user = await this.sessions.user(request.headers);
+    await this.users.completeOnboarding(user.id);
   }
 
   @Get("usage")

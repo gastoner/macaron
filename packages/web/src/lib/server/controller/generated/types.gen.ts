@@ -26,10 +26,34 @@ export type GetMeResponses = {
         avatarUrl: string | null;
         role: 'user' | 'admin';
         capabilities: Array<'triage' | 'plan' | 'implement' | 'reproduce' | 'verify' | 'review' | 'remember'>;
+        onboardedAt: string | null;
     };
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type CompleteMyOnboardingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/me/onboarding';
+};
+
+export type CompleteMyOnboardingErrors = {
+    /**
+     * No valid session
+     */
+    401: unknown;
+};
+
+export type CompleteMyOnboardingResponses = {
+    /**
+     * Recorded
+     */
+    204: void;
+};
+
+export type CompleteMyOnboardingResponse = CompleteMyOnboardingResponses[keyof CompleteMyOnboardingResponses];
 
 export type GetMyUsageData = {
     body?: never;

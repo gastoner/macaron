@@ -268,6 +268,17 @@ describe("UsersService", () => {
   it("never edits an admin", async () => {
     expect((await refusal(new UsersService(db).setCapabilities(admin.id, ["review"], admin))).field).toBe("capabilities");
   });
+
+  it("records when a user closed the onboarding, once", async () => {
+    const users_ = new UsersService(db);
+    expect(await users_.onboardedAt(admin.id)).toBeNull();
+    await users_.completeOnboarding(admin.id);
+    const first = await users_.onboardedAt(admin.id);
+    expect(first).toBeInstanceOf(Date);
+    await users_.completeOnboarding(admin.id);
+    expect(await users_.onboardedAt(admin.id)).toEqual(first);
+    expect(await users_.onboardedAt("nobody")).toBeNull();
+  });
 });
 
 describe("UsageService", () => {
