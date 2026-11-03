@@ -65,12 +65,12 @@ export interface Escalation {
 
 const DispatchDetails = z.object({ workflow_run_id: z.int().positive() });
 
-/** Keys outlive the job by this margin before their backend expires them on its own. */
+/** Keys outlive the job by this margin before Bifrost expires them on its own. */
 export const KEY_GRACE_MINUTES = 15;
 
 /** The run's key, if it got one. */
 function keyOf(run: RunRecord): RunKeyRef | undefined {
-  return run.keyBackend === null || run.keyHash === null ? undefined : { backend: run.keyBackend, hash: run.keyHash };
+  return run.keyHash === null ? undefined : { hash: run.keyHash };
 }
 
 /**
@@ -135,7 +135,7 @@ export class RunLauncher {
       const ghRunId = await this.dispatch(run, config, context);
       await this.runs.markDispatched(run.id, ghRunId);
       this.logger.log(`run ${run.id} (${thread.repo}#${String(thread.number)} loop ${String(run.loop)} ${mode}) dispatched as ${String(ghRunId)}`);
-      dispatched = { ...run, status: "dispatched", ghRunId, keyBackend: minted.backend, keyHash: minted.hash };
+      dispatched = { ...run, status: "dispatched", ghRunId, keyHash: minted.hash };
     } catch (error: unknown) {
       if (key !== undefined) await this.budget.revoke(key);
       // The key never reached a runner: nothing was spent.
@@ -143,7 +143,7 @@ export class RunLauncher {
       await this.runs.settle(run.id, 0, this.attribution(config), this.clock.now());
       this.logger.error(`launching run ${run.id} failed: ${describeError(error)}`);
       // Said, not retried: in compact mode 👀 would otherwise be all the asker ever sees. The error
-      // stays in the logs: it may name an endpoint or a key's backend.
+      // stays in the logs: it may name an endpoint.
       try {
         await this.publisher.reportFailure({ run, thread, reason: "the run could not be started; maintainers have been notified", runUrl: null });
       } catch (reportError: unknown) {
@@ -164,12 +164,11 @@ export class RunLauncher {
   async bootstrap(oidcToken: string, ticket: Ticket): Promise<BootstrapResponse> {
     const verified = await this.oidc.verify(oidcToken);
     const { key, run } = await this.runs.redeem(ticket, verified.runId, this.clock.now());
-    if (run.keyBackend === null) throw new Error(`run ${run.id} has a key but no key backend`);
     this.logger.log(`run ${run.id} bootstrapped by workflow run ${String(verified.runId)}`);
     const config = this.config.repo(run.context.repo);
     return {
       // The fast model fixed at launch: the key's allowlist was built from it, whatever the config says now.
-      llm: { baseUrl: this.budget.baseUrl(run.keyBackend), key, fastModel: run.fastModel ?? run.model },
+      llm: { baseUrl: this.budget.baseUrl, key, fastModel: run.fastModel ?? run.model },
       harness: config?.harness ?? "claude",
       model: run.model,
       context: run.context,
@@ -184,7 +183,7 @@ export class RunLauncher {
     const config = this.config.repo(thread.repo);
     const url = runUrl(this.env, ghRunId);
 
-    // Spending stops now; the cost is settled in the background once the backend has reported it.
+    // Spending stops now; the cost is settled in the background once Bifrost has reported it.
     await this.stopSpending(run);
 
     const fail = async (reason: string): Promise<Escalation | undefined> => {
@@ -275,11 +274,11 @@ export class RunLauncher {
     }
   }
 
-  /** Freezes the run's key and schedules its settlement once the backend's usage has caught up. */
+  /** Freezes the run's key and schedules its settlement once Bifrost's usage has caught up. */
   private async stopSpending(run: RunRecord): Promise<void> {
     const key = keyOf(run);
     if (key !== undefined) await this.budget.freeze(key);
-    await this.jobs.settleCost(run.id, key === undefined ? 0 : this.budget.usageLagMs(key.backend));
+    await this.jobs.settleCost(run.id, key === undefined ? 0 : this.budget.usageLagMs);
   }
 
   /** Who pays for the run, or why it doesn't start now. */
@@ -288,8 +287,6 @@ export class RunLauncher {
     const { config, thread } = request;
     const mode = request.route.mode;
     if (!this.env.MACARON_ENABLED) return refused("the bot is paused by its maintainers");
-    // OpenRouter keys spend the workspace's credit: no run may be billed to anyone else than its payer.
-    if (this.budget.activeBackend !== "bifrost") return refused("the bot's LLM gateway can't bill users' keys: its maintainers must switch it to Bifrost");
     // The run is for an account (whoever asked, or for escalations and retries, whoever asked first),
     // which must hold the capability its mode needs, and pays for it.
     const asker = request.triggerGithubId === null ? undefined : await this.users.asker(request.triggerGithubId);

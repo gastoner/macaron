@@ -63,7 +63,7 @@ export class RepoConfigService implements OnModuleInit, OnApplicationShutdown {
     process.off("SIGHUP", this.onHangup);
   }
 
-  /** Adds a check every later configuration must pass (e.g. the active LLM backend prices its models). */
+  /** Adds a check every later configuration must pass (e.g. Bifrost prices its models). */
   addCheck(check: ConfigCheck): void {
     this.checks.push(check);
   }

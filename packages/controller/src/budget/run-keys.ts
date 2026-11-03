@@ -1,13 +1,7 @@
-import { z } from "zod";
-
-/** Where a run's LLM key lives. Stored on each run, so a run is always settled where its key was minted. */
-export const LlmBackend = z.enum(["openrouter", "bifrost"]);
-export type LlmBackend = z.infer<typeof LlmBackend>;
-
 export interface ProvisionedKey {
   /** The bearer key, shown once at creation. */
   readonly key: string;
-  /** The backend's id for the key: what every later call (disable, usage, delete) refers to. */
+  /** The gateway's id for the key: what every later call (disable, usage, delete) refers to. */
   readonly hash: string;
 }
 
@@ -30,17 +24,16 @@ export interface KeyStatus {
  * Implementations hold the credential that mints keys; it never leaves them.
  */
 export abstract class RunKeys {
-  abstract readonly backend: LlmBackend;
   /** Where runners send Anthropic Messages requests with a minted key. */
   abstract readonly baseUrl: string;
   /** How long after a key is frozen before its usage is complete enough to read. */
   abstract readonly usageLagMs: number;
 
-  /** Checks the backend is usable before the controller accepts work. */
+  /** Checks the gateway is usable before the controller accepts work. */
   abstract init(): Promise<void>;
-  /** A key capped at `limitUsd`, refused after `expiresAt`, usable only with `models` where the backend can restrict them, over `upstream`'s key. */
+  /** A key capped at `limitUsd`, refused after `expiresAt`, usable only with `models`, over `upstream`'s key. */
   abstract create(name: string, limitUsd: number, expiresAt: Date, models: readonly string[], upstream: Upstream): Promise<ProvisionedKey>;
-  /** The models among `models` this backend can't bill, so a key's budget wouldn't limit them. */
+  /** The models among `models` that can't be billed, so a key's budget wouldn't limit them. */
   abstract unpriced(models: readonly string[]): Promise<string[]>;
   /** Immediate: the next request made with the key is refused. */
   abstract disable(hash: string): Promise<void>;

@@ -1,15 +1,17 @@
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { type AppEnv, type BifrostEnv, Env } from "../../src/config/env.ts";
+import type { BifrostEnv } from "../../src/config/env.ts";
+
+const LiveGitHub = z.object({ GH_PUSH: z.string().min(20), GITHUB_API_VERSION: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default("2026-03-10") });
 
 /**
- * The real environment for live tests (`pnpm test:live`, with ~/.config/macaron/dev.env loaded),
+ * The bot's push token for live tests (`pnpm test:live`, with ~/.config/macaron/dev.env loaded),
  * or undefined when it isn't there — live tests then skip instead of failing.
  */
-export function liveEnv(): AppEnv | undefined {
+export function liveGitHub(): { readonly pushToken: string; readonly apiVersion: string } | undefined {
   // eslint-disable-next-line no-restricted-syntax -- tests read the developer's real environment on purpose
-  const parsed = Env.safeParse(process.env);
-  return parsed.success ? parsed.data : undefined;
+  const parsed = LiveGitHub.safeParse(process.env);
+  return parsed.success ? { pushToken: parsed.data.GH_PUSH, apiVersion: parsed.data.GITHUB_API_VERSION } : undefined;
 }
 
 const LiveBifrost = z.object({

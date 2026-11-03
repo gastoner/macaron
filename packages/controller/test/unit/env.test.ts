@@ -7,24 +7,9 @@ describe("MACARON_ALLOWED_USER_IDS", () => {
   });
 });
 
-describe("LLM backends", () => {
-  const bifrost = {
-    BIFROST_ADMIN_URL: "http://macaron-bifrost:8080",
-    BIFROST_PUBLIC_URL: "https://macaron.example.test/llm/anthropic",
-    BIFROST_ADMIN_PASSWORD: "bifrost-admin-password-000",
-    LLM_PRICING_FILE: "/etc/macaron/pricing/pricing.json",
-  };
-
-  it("defaults to OpenRouter, with Bifrost unconfigured", () => {
-    const env = testEnv();
-    expect(env.LLM_BACKEND).toBe("openrouter");
-    expect(env.openRouter?.workspace).toBe("macaron");
-    expect(env.bifrost).toBeUndefined();
-  });
-
-  it("configures Bifrost when its variables are set, alongside OpenRouter", () => {
-    const env = testEnv({ ...bifrost, LLM_BACKEND: "bifrost" });
-    expect(env.bifrost).toEqual({
+describe("Bifrost", () => {
+  it("is configured from its variables", () => {
+    expect(testEnv().bifrost).toEqual({
       adminUrl: "http://macaron-bifrost:8080",
       publicUrl: "https://macaron.example.test/llm/anthropic",
       username: "macaron",
@@ -32,23 +17,15 @@ describe("LLM backends", () => {
       pricingFile: "/etc/macaron/pricing/pricing.json",
       requestsPerMinute: 60,
     });
-    expect(env.openRouter).toBeDefined();
   });
 
-  it("requires the selected backend's variables", () => {
-    expect(() => testEnv({ LLM_BACKEND: "bifrost" })).toThrow(/BIFROST_ADMIN_URL: required for the Bifrost backend/);
-    expect(() => testEnv({ OPENROUTER_PROVISIONING_KEY: "" })).toThrow(/OPENROUTER_PROVISIONING_KEY/);
-  });
-
-  it("refuses a half-configured backend even when it isn't selected", () => {
-    expect(() => testEnv({ BIFROST_ADMIN_URL: "http://macaron-bifrost:8080" })).toThrow(/BIFROST_PUBLIC_URL: required/);
-    // Without prices, no endpoint's provider could be priced: every key would be refused.
-    const withoutPrices = Object.fromEntries(Object.entries(bifrost).filter(([name]) => name !== "LLM_PRICING_FILE"));
-    expect(() => testEnv(withoutPrices)).toThrow(/LLM_PRICING_FILE: required for the Bifrost backend/);
+  it("is required, prices included: without them no endpoint's provider could be priced", () => {
+    expect(() => testEnv({ BIFROST_ADMIN_URL: "" })).toThrow(/BIFROST_ADMIN_URL/);
+    expect(() => testEnv({ LLM_PRICING_FILE: "" })).toThrow(/LLM_PRICING_FILE/);
   });
 
   it("refuses a public URL runners would reach in clear text", () => {
-    expect(() => testEnv({ ...bifrost, BIFROST_PUBLIC_URL: "http://macaron.example.test/llm/anthropic" })).toThrow(/BIFROST_PUBLIC_URL/);
+    expect(() => testEnv({ BIFROST_PUBLIC_URL: "http://macaron.example.test/llm/anthropic" })).toThrow(/BIFROST_PUBLIC_URL/);
   });
 });
 

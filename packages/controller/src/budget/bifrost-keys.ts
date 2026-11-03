@@ -52,7 +52,6 @@ const StoredPatch = z.record(z.string(), z.unknown());
  * credentials, which never leave this class; the admin API is reachable on the internal network only.
  */
 export class BifrostKeys extends RunKeys {
-  readonly backend = "bifrost";
   readonly baseUrl: string;
   /** Bifrost keeps spend in memory and reads it back live (`from_memory`); a short wait covers late usage. */
   readonly usageLagMs = 15_000;

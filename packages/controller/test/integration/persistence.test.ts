@@ -101,14 +101,14 @@ describe("RunsRepository", () => {
 
   it("hands out a key once, only to the workflow run it was dispatched as, and wipes it", async () => {
     const { run } = await newRun(2);
-    await runs.attachKey(run.id, { backend: "openrouter", hash: "hash-2", key: "sk-or-v1-secret" });
+    await runs.attachKey(run.id, { hash: "hash-2", key: "vk-secret" });
 
     await expect(runs.redeem(ticket(2), 555, new Date())).rejects.toBeInstanceOf(RunNotBoundYet);
     await runs.markDispatched(run.id, 555);
     await expect(runs.redeem(ticket(2), 999, new Date())).rejects.toBeInstanceOf(TicketRejected);
 
     const redemption = await runs.redeem(ticket(2), 555, new Date());
-    expect(redemption.key).toBe("sk-or-v1-secret");
+    expect(redemption.key).toBe("vk-secret");
     expect((await runs.byId(run.id)).keySecret).toBeNull();
 
     await expect(runs.redeem(ticket(2), 555, new Date())).rejects.toBeInstanceOf(TicketAlreadyRedeemed);
@@ -116,7 +116,7 @@ describe("RunsRepository", () => {
 
   it("lets exactly one of two concurrent redemptions win", async () => {
     const { run } = await newRun(3);
-    await runs.attachKey(run.id, { backend: "openrouter", hash: "hash-3", key: "sk-or-v1-race" });
+    await runs.attachKey(run.id, { hash: "hash-3", key: "vk-race" });
     await runs.markDispatched(run.id, 777);
 
     const outcomes = await Promise.allSettled([runs.redeem(ticket(3), 777, new Date()), runs.redeem(ticket(3), 777, new Date())]);

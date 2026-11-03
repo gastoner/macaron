@@ -106,7 +106,7 @@ export class RunsRepository {
   }
 
   async attachKey(runId: string, key: MintedKey): Promise<void> {
-    await this.db.update(runs).set({ keyBackend: key.backend, keyHash: key.hash, keySecret: key.key }).where(eq(runs.id, runId));
+    await this.db.update(runs).set({ keyHash: key.hash, keySecret: key.key }).where(eq(runs.id, runId));
   }
 
   async markDispatched(runId: string, ghRunId: number): Promise<void> {

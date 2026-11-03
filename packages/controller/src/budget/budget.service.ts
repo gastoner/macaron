@@ -1,16 +1,15 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnModuleInit } from "@nestjs/common";
 import { Clock } from "../common/clock.ts";
 import { describeError, UpstreamError } from "../common/errors.ts";
 import { toMicros, type UsdMicros } from "../common/money.ts";
-import type { KeyStatus, LlmBackend, Upstream } from "./run-keys.ts";
-import { RunKeysRegistry } from "./run-keys.registry.ts";
+import { CONFIGURED_MODELS } from "../config/configured-models.ts";
+import { type KeyStatus, RunKeys, type Upstream } from "./run-keys.ts";
 
 /** Prefix of every key we mint; the sweeper only ever touches keys with this prefix. */
 export const RUN_KEY_PREFIX = "macaron-run-";
 
-/** A run's key as the runs table records it: which backend, and the backend's id for it. */
+/** A run's key as the runs table records it: the gateway's id for it. */
 export interface RunKeyRef {
-  readonly backend: LlmBackend;
   readonly hash: string;
 }
 
@@ -19,92 +18,91 @@ export interface MintedKey extends RunKeyRef {
   readonly key: string;
 }
 
-export interface SweepableKey extends KeyStatus {
-  readonly backend: LlmBackend;
-}
-
 @Injectable()
-export class BudgetService {
+export class BudgetService implements OnModuleInit, OnApplicationBootstrap {
   private readonly logger = new Logger(BudgetService.name);
 
+  /** `configuredModels` lists every model the loaded configuration can give a run. */
   constructor(
-    private readonly keys: RunKeysRegistry,
+    private readonly keys: RunKeys,
     private readonly clock: Clock,
+    @Inject(CONFIGURED_MODELS) private readonly configuredModels: () => readonly string[] = () => [],
   ) {}
 
+  /** The gateway must answer before the controller accepts work. */
+  async onModuleInit(): Promise<void> {
+    await this.keys.init();
+  }
+
   /**
-   * A key for one run, on the active backend, over `upstream` (the payer's endpoint and key):
-   * capped at `limitUsd`, usable only with `models` where the backend can enforce it, and expiring
-   * by itself `ttlMinutes` from now even if the controller never gets to settle it.
+   * Refuses to start when a configured model can't be billed: every run would otherwise fail at
+   * launch. A reloaded configuration goes through the same check (registered on RepoConfigService);
+   * minting still refuses an unpriced model.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    const unpriced = await this.keys.unpriced(this.configuredModels());
+    if (unpriced.length > 0) throw new Error(`the LLM gateway has no price for configured models: ${unpriced.join(", ")}`);
+  }
+
+  /**
+   * A key for one run, over `upstream` (the payer's endpoint and key): capped at `limitUsd`, usable
+   * only with `models`, and expiring by itself `ttlMinutes` from now even if the controller never
+   * gets to settle it.
    */
   async mint(runId: string, limitUsd: number, ttlMinutes: number, models: readonly string[], upstream: Upstream): Promise<MintedKey> {
-    const backend = this.keys.active;
     const expiresAt = new Date(this.clock.now().getTime() + ttlMinutes * 60_000);
-    const key = await backend.create(`${RUN_KEY_PREFIX}${runId}`, limitUsd, expiresAt, models, upstream);
-    return { backend: backend.backend, ...key };
+    return this.keys.create(`${RUN_KEY_PREFIX}${runId}`, limitUsd, expiresAt, models, upstream);
   }
 
-  /** Where runners send their requests with a key of `backend`. */
-  baseUrl(backend: LlmBackend): string {
-    return this.keys.of(backend).baseUrl;
+  /** Where runners send their requests with a run key. */
+  get baseUrl(): string {
+    return this.keys.baseUrl;
   }
 
-  /** How long to wait after freezing a key of `backend` before its usage is worth reading. */
-  usageLagMs(backend: LlmBackend): number {
-    return this.keys.of(backend).usageLagMs;
+  /** How long to wait after freezing a key before its usage is worth reading. */
+  get usageLagMs(): number {
+    return this.keys.usageLagMs;
   }
 
   /** What the key spent since `since` (a little before the run started). */
   async usage(ref: RunKeyRef, since: Date): Promise<UsdMicros> {
-    return toMicros(await this.keys.of(ref.backend).spentSince(ref.hash, since));
+    return toMicros(await this.keys.spentSince(ref.hash, since));
   }
 
   /** Spending stops now: the next request with the key is refused. Idempotent. */
   async freeze(ref: RunKeyRef): Promise<void> {
-    await this.keys.of(ref.backend).disable(ref.hash);
+    await this.keys.disable(ref.hash);
   }
 
   /** Best effort, for cleanup paths: never throws (the sweeper is the safety net); a missing key is fine. */
   async revoke(ref: RunKeyRef): Promise<void> {
     try {
-      const keys = this.keys.of(ref.backend);
-      await keys.disable(ref.hash);
-      await keys.delete(ref.hash);
+      await this.keys.disable(ref.hash);
+      await this.keys.delete(ref.hash);
     } catch (error: unknown) {
       if (httpStatusOf(error) === 404) return;
-      this.logger.error(`revoking ${ref.backend} key ${ref.hash.slice(0, 8)}… failed: ${describeError(error)}`);
+      this.logger.error(`revoking key ${ref.hash.slice(0, 8)}… failed: ${describeError(error)}`);
     }
   }
 
-  /** The backend new runs are minted on. */
-  get activeBackend(): LlmBackend {
-    return this.keys.activeBackend;
-  }
-
-  /** Users' keys left on a backend by an interrupted mint, except the runs `keep` names: removed, for the sweeper. */
+  /** Users' keys left on the gateway by an interrupted mint, except the runs `keep` names: removed, for the sweeper. */
   async sweepUpstreamKeys(keep: ReadonlySet<string>): Promise<string[]> {
-    const removed: string[] = [];
-    for (const keys of this.keys.all) {
-      try {
-        removed.push(...(await keys.sweepUpstreamKeys(RUN_KEY_PREFIX, keep)));
-      } catch (error: unknown) {
-        this.logger.error(`sweeping ${keys.backend} upstream keys failed: ${describeError(error)}`);
-      }
+    try {
+      return await this.keys.sweepUpstreamKeys(RUN_KEY_PREFIX, keep);
+    } catch (error: unknown) {
+      this.logger.error(`sweeping upstream keys failed: ${describeError(error)}`);
+      return [];
     }
-    return removed;
   }
 
-  /** Every run key on every reachable backend, for the sweeper: a backend that fails is logged and skipped. */
-  async runKeys(): Promise<SweepableKey[]> {
-    const found: SweepableKey[] = [];
-    for (const keys of this.keys.all) {
-      try {
-        for (const key of await keys.listByPrefix(RUN_KEY_PREFIX)) found.push({ ...key, backend: keys.backend });
-      } catch (error: unknown) {
-        this.logger.error(`listing ${keys.backend} run keys failed: ${describeError(error)}`);
-      }
+  /** Every run key, for the sweeper: a failure is logged and finds none. */
+  async runKeys(): Promise<KeyStatus[]> {
+    try {
+      return await this.keys.listByPrefix(RUN_KEY_PREFIX);
+    } catch (error: unknown) {
+      this.logger.error(`listing run keys failed: ${describeError(error)}`);
+      return [];
     }
-    return found;
   }
 }
 

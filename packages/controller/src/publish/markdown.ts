@@ -3,7 +3,7 @@ import { markdownTable } from "markdown-table";
 import { formatUsd, type UsdMicros } from "../common/money.ts";
 import { applyEdits, htmlRanges, proseRanges } from "./markdown-ast.ts";
 
-/** Shown while OpenRouter hasn't reported a loop's final cost yet. */
+/** Shown while Bifrost hasn't reported a loop's final cost yet. */
 const SETTLING = "⏳";
 
 /** GitHub rejects bodies over 65 536 characters; keep room for our own sections. */
@@ -59,7 +59,7 @@ export interface CostRow {
   readonly trigger: string;
   readonly mode: Mode;
   readonly model: string;
-  /** null while OpenRouter hasn't reported the final usage yet. */
+  /** null while Bifrost hasn't reported the final usage yet. */
   readonly costMicros: UsdMicros | null;
   readonly runUrl: string | null;
 }

@@ -15,7 +15,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { Capability, type RunContext } from "@open-macaron/contracts";
-import { LlmBackend } from "../budget/run-keys.ts";
 import type { Route } from "../routing/routes.ts";
 
 /** Money is stored as integer micro-dollars: no floating point anywhere near a bill. */
@@ -28,7 +27,6 @@ export const eventStatus = pgEnum("event_status", ["pending", "done", "dropped",
 export const runStatus = pgEnum("run_status", ["pending", "dispatched", "running", "completed", "failed", "aborted"]);
 export const runMode = pgEnum("run_mode", ["triage", "plan", "implement", "address_review", "reproduce", "verify", "retro", "review"]);
 export const ledgerKind = pgEnum("ledger_kind", ["run", "router"]);
-export const llmBackend = pgEnum("llm_backend", LlmBackend.enum);
 /** What a user may ask the bot for: one value per capability, appended by migrations, never renamed. */
 export const capability = pgEnum("capability", Capability.enum);
 export const userRole = pgEnum("user_role", ["user", "admin"]);
@@ -154,8 +152,6 @@ export const runs = pgTable(
     context: jsonb("context").$type<RunContext>().notNull(),
     /** What the run was routed to do: where it answers, what it checked out. Null before this column existed. */
     route: jsonb("route").$type<Route>(),
-    /** Where the run's key was minted; set together with key_hash. */
-    keyBackend: llmBackend("key_backend"),
     keyHash: text("key_hash"),
     /** The run's LLM key, held only until the ticket is redeemed, then wiped. */
     keySecret: text("key_secret"),
@@ -168,7 +164,7 @@ export const runs = pgTable(
     ghRunId: bigint("gh_run_id", { mode: "number" }),
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
-    /** Set once the key's final usage is in the ledger (backends report usage some seconds late). */
+    /** Set once the key's final usage is in the ledger (Bifrost reports usage some seconds late). */
     settledAt: timestamp("settled_at", { withTimezone: true }),
     failure: text("failure"),
     createdAt: createdAt(),

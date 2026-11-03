@@ -28,7 +28,7 @@ export const KEY_MAX_AGE_MS = (MAX_TIMEOUT_MINUTES + KEY_GRACE_MINUTES + 60) * 6
  * Safety nets, scheduled by pg-boss (one instance runs each tick):
  * - reconcile: completions missed while the controller was down, runs that never started, timeouts,
  *   and a published configuration whose deployment webhook didn't arrive;
- * - sweep: run keys that outlived their run, on every configured backend (keys also expire on their own).
+ * - sweep: run keys that outlived their run (keys also expire on their own).
  */
 @Injectable()
 export class Housekeeping implements OnApplicationBootstrap {
@@ -85,7 +85,7 @@ export class Housekeeping implements OnApplicationBootstrap {
     const now = this.clock.now().getTime();
     for (const key of await this.budget.runKeys()) {
       if (!active.has(key.name) || now - key.createdAt.getTime() > KEY_MAX_AGE_MS) {
-        this.logger.warn(`deleting leftover ${key.backend} key ${key.name}`);
+        this.logger.warn(`deleting leftover key ${key.name}`);
         await this.budget.revoke(key);
       }
     }

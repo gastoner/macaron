@@ -34,7 +34,6 @@
     "@octokit/webhooks": "catalog:",
     "@open-macaron/contracts": "workspace:*",
     "@open-macaron/review": "workspace:*",
-    "@openrouter/sdk": "catalog:",
     "@secretlint/core": "catalog:",
     "@secretlint/secretlint-rule-pattern": "catalog:",
     "@secretlint/secretlint-rule-preset-recommend": "catalog:",

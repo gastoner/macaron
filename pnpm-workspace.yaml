@@ -50,8 +50,6 @@ catalog:
   p-retry: 8.0.1
   diff: 9.0.0
   "@octokit/webhooks": 14.2.0
-  # OpenRouter (official SDK, generated from their OpenAPI spec)
-  "@openrouter/sdk": 1.4.25
   # Users: GitHub sign-in and sessions (controller), its client (web)
   better-auth: 1.7.11
   # Approved LLM endpoints: only public unicast addresses (IPv4 and IPv6 ranges, IPv4-mapped included)
@@ -108,7 +106,6 @@ catalog:
   "@playwright/test": 1.64.1
 
 allowBuilds:
-  '@openrouter/sdk': false
   '@scarf/scarf': false
   '@swc/core': true
   cpu-features: false
