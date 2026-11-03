@@ -71,7 +71,7 @@ export function renderCostTable(rows: readonly CostRow[], routerMicros: UsdMicro
     escapeCell(row.trigger),
     row.mode,
     STATE_LABEL[row.state],
-    escapeCell(row.model.replace(/^[^/]+\//, "")),
+    escapeCell(modelName(row.model)),
     row.costMicros === null ? SETTLING : formatUsd(row.costMicros),
     row.runUrl === null ? "" : `[run](${row.runUrl})`,
   ]);
@@ -96,16 +96,23 @@ export function upsertCostSection(body: string, section: string): string {
   return `${body.slice(0, start)}${section}${body.slice(end + COST_END.length)}`;
 }
 
+/** A model as readers know it, without the LLM backend's provider prefix (`anthropic/…`). */
+export function modelName(model: string): string {
+  return model.replace(/^[^/]+\//, "");
+}
+
 /** markdown-table doesn't escape cell content: a `|` would split the cell. */
 export function escapeCell(text: string): string {
   return text.replaceAll("|", "\\|").replaceAll("\n", " ");
 }
 
-/** What a status comment's first line says about a run: mode, platform, run link, the lessons it was given. */
+/** What a status comment's first line says about a run: mode, platform, model, run link, the lessons it was given. */
 export interface StatusHeader {
   readonly loop: number;
   readonly mode: string;
   readonly platform: Platform;
+  /** The model the run was launched with: readers can tell what wrote the answer. */
+  readonly model: string;
   readonly runUrl: string | null;
   readonly knowledge: Pick<RunKnowledge, "commit" | "lessons">;
 }
@@ -119,11 +126,12 @@ export interface RunFooter extends StatusHeader {
 
 const PLATFORM_NAMES: Readonly<Record<Platform, string>> = { linux: "Linux", windows: "Windows", macos: "macOS" };
 
-/** `**macaron-bot** · loop 2 · `reproduce` · Windows · [run](…) · 3 lessons from open-macaron/knowledge@abc1234` */
+/** `**macaron-bot** · loop 2 · `reproduce` · Windows · model `…` · [run](…) · 3 lessons from open-macaron/knowledge@abc1234` */
 export function statusHeader(header: StatusHeader): string {
   const parts = [`**macaron-bot**`, `loop ${String(header.loop)}`, `\`${header.mode}\``];
   // Linux is every run's default: only another platform is worth a word.
   if (header.platform !== "linux") parts.push(PLATFORM_NAMES[header.platform]);
+  parts.push(`model \`${modelName(header.model)}\``);
   if (header.runUrl !== null) parts.push(`[run](${header.runUrl})`);
   return [...parts, ...lessonsPart(header.knowledge)].join(" · ");
 }
@@ -136,6 +144,7 @@ export function runFooter(footer: RunFooter, where: string, spent: string): stri
   const parts = ["macaron-bot", `loop ${String(footer.loop)}`, `\`${footer.mode}\``];
   // The runner label names the platform already.
   if (footer.runner !== undefined) parts.push(`runner \`${footer.runner}\``);
+  parts.push(`model \`${modelName(footer.model)}\``);
   if (footer.runUrl !== null) parts.push(`[run${footer.ghRunId === null ? "" : ` ${String(footer.ghRunId)}`}](${footer.runUrl})`);
   return ["---", `<sub>${[...parts, ...lessonsPart(footer.knowledge)].join(" · ")}</sub>`, ...(where === "" ? [] : [where]), spent].join("\n");
 }

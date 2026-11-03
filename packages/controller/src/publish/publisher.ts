@@ -235,6 +235,7 @@ export class Publisher {
       knowledgeCommit: review.knowledgeCommit,
       loop: run.loop,
       runner: runnerFor(config, HeaderContext.parse(run.context).platform),
+      model: run.model,
       ghRunId: run.ghRunId,
       runUrl: input.runUrl,
       costMicros: null,
@@ -285,7 +286,7 @@ export class Publisher {
       config?.compact === true
         ? `${outcome}\n\n${await this.footer(thread, subject, run, config, runUrl)}`
         : [
-            statusHeader({ loop: run.loop, mode: run.mode, runUrl, ...HeaderContext.parse(run.context) }),
+            statusHeader({ loop: run.loop, mode: run.mode, model: run.model, runUrl, ...HeaderContext.parse(run.context) }),
             "",
             outcome,
             ...workContinues(thread, subject).flatMap((line) => ["", line]),
@@ -301,9 +302,9 @@ export class Publisher {
     });
   }
 
-  /** A compact answer's footer: the run, its runner, where work continues, the thread's spending. */
+  /** A compact answer's footer: the run, its runner and model, where work continues, the thread's spending. */
   private async footer(thread: ThreadRecord, subject: Subject, run: RunRecord, config: RepoConfig, runUrl: string | null): Promise<string> {
-    const header = { loop: run.loop, mode: run.mode, runUrl, ...HeaderContext.parse(run.context) };
+    const header = { loop: run.loop, mode: run.mode, model: run.model, runUrl, ...HeaderContext.parse(run.context) };
     const [where] = workContinues(thread, subject);
     return runFooter({ ...header, runner: runnerFor(config, header.platform), ghRunId: run.ghRunId }, where ?? "", spentLine(...(await this.spent(thread))));
   }
