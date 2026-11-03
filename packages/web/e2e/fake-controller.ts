@@ -194,7 +194,7 @@ async function route(request: IncomingMessage): Promise<Reply> {
 
   if (user === undefined) return reply(401, undefined, { error: "sign_in_required" });
   if (url.pathname === "/v1/me") {
-    return reply(200, zGetMeResponse, { githubId: user.githubId, githubLogin: user.githubLogin, name: user.name, avatarUrl: user.avatarUrl, role: user.role, capabilities: user.capabilities });
+    return reply(200, zGetMeResponse, { githubId: user.githubId, githubLogin: user.githubLogin, name: user.name, avatarUrl: user.avatarUrl, role: user.role, capabilities: user.capabilities, onboardedAt: user.createdAt });
   }
   if (url.pathname === "/v1/projects") {
     if (state.projectsBroken) return reply(500, undefined, { error: "internal" });

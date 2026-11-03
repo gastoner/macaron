@@ -20,6 +20,8 @@ export const Me = z.object({
   avatarUrl: z.url().nullable(),
   role: z.enum(["user", "admin"]),
   capabilities: z.array(Capability),
+  /** When they closed the web app's onboarding; null until then. */
+  onboardedAt: Timestamp.nullable(),
 });
 export type Me = z.infer<typeof Me>;
 

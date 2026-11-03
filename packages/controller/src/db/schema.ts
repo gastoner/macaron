@@ -234,6 +234,8 @@ export const users = pgTable("users", {
   capabilities: capability("capabilities").array().notNull().default(sql`'{}'::capability[]`),
   /** What the user's runs may cost each calendar month (UTC), on their key; null for no cap of their own. */
   monthlyCapMicros: usdMicros("monthly_cap_micros"),
+  /** When the user closed the web app's onboarding; null until then, so it opens at their first visit. */
+  onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
