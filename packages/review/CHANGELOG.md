@@ -1,5 +1,12 @@
 # @open-macaron/review
 
+## 0.3.12
+
+### Patch Changes
+
+- Updated dependencies [96f4b99]
+  - @open-macaron/contracts@0.12.0
+
 ## 0.3.11
 
 ### Patch Changes

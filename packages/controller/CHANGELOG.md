@@ -1,5 +1,17 @@
 # @open-macaron/controller
 
+## 0.13.0
+
+### Minor Changes
+
+- 96f4b99: `GET /v1/me` says when the user closed the web app's onboarding (`onboardedAt`, null until then), and `PUT /v1/me/onboarding` records it, keeping the first time. Existing accounts count as onboarded.
+
+### Patch Changes
+
+- Updated dependencies [96f4b99]
+  - @open-macaron/contracts@0.12.0
+  - @open-macaron/review@0.3.12
+
 ## 0.12.0
 
 ### Minor Changes
