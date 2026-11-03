@@ -5,7 +5,6 @@
   import CircleDollarSignIcon from "@lucide/svelte/icons/circle-dollar-sign";
   import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
   import { resolve } from "$app/paths";
-  import { page } from "$app/state";
   import CapabilityBadges from "#lib/components/admin/capability-badges.svelte";
   import TableSkeleton from "#lib/components/admin/table-skeleton.svelte";
   import PageHeader from "#lib/components/shell/page-header.svelte";
@@ -21,10 +20,6 @@
   import { Progress } from "#lib/components/ui/progress/index.js";
   import OnboardingDialog from "./onboarding/onboarding-dialog.svelte";
   import { getMonth, getMyKey } from "./settings/key/key.remote.ts";
-
-  // Until the controller records who finished onboarding (#137, #138): opened by `?welcome`.
-  let onboarding = $state(page.url.searchParams.has("welcome"));
-
   /** Why the bot can't run for this user now, or undefined when their key is usable. */
   function keyProblem(mine: MyLlmKey): string | undefined {
     if (mine.key === null) return "Every run is billed to the LLM key of whoever asks for it, and you haven't saved one.";
@@ -33,8 +28,6 @@
     return undefined;
   }
 </script>
-
-<OnboardingDialog bind:open={onboarding} />
 
 <PageHeader title="Overview" description="What you asked the bot for this month, what it cost, and what you may ask for.">
   {#snippet actions()}
@@ -48,6 +41,7 @@
 <svelte:boundary>
   {@const [me, usage, mine, month] = await Promise.all([getMe(), getUsage({ limit: 5 }), getMyKey(), getMonth()])}
   {@const problem = keyProblem(mine)}
+  <OnboardingDialog onboarded={me.onboardedAt !== null} />
   {#if problem !== undefined}
     <Alert.Root variant="destructive">
       <KeyRoundIcon />
