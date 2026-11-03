@@ -40,7 +40,7 @@ flowchart LR
 - **The user's key is in Bifrost for one run only:** added to the endpoint's provider under the run key's name (`macaron-run-<run id>`) when the run is minted, and the run's virtual key may use that key alone (`key_ids`). It is removed as soon as the run stops spending (completion or abort); settlement still reads the spend from the virtual key, then deletes it. Housekeeping sweeps any user key no unsettled run names.
 - **A Bifrost restart breaks in-flight runs** (their keys and bindings are gone). `deploy.sh` refuses to restart Bifrost while a run is unsettled; an eviction mid-run fails that run, and its user retries.
 - **Prices are list prices.** An endpoint may bill differently (the company gateway does): the web app says "estimated", and each endpoint carries a pricing note.
-- **No shared key:** Bifrost's configuration has no provider and no LLM key. `LLM_BACKEND=openrouter` refuses runs: OpenRouter can't bill a user's key.
+- **No shared key:** Bifrost's configuration has no provider and no LLM key.
 
 ## 3. Storing users' keys (#59)
 

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { BifrostKeys } from "../../src/budget/bifrost-keys.ts";
 import { BudgetService, RUN_KEY_PREFIX } from "../../src/budget/budget.service.ts";
 import { PriceList } from "../../src/budget/price-list.ts";
-import { RunKeysRegistry } from "../../src/budget/run-keys.registry.ts";
 import { SystemClock } from "../../src/common/clock.ts";
 import { liveBifrost, liveUpstream } from "../support/live.ts";
 
@@ -31,9 +30,8 @@ describe.skipIf(env === undefined || user === undefined)("Bifrost run keys over 
   it("bills a run to its payer's key alone, refuses requests without its virtual key, charges every allowed model, and takes the key out of Bifrost at freeze", { timeout: 180_000 }, async () => {
     if (env === undefined || user === undefined) return;
     const keys = new BifrostKeys(env, PriceList.fromFile(env.pricingFile));
-    const registry = new RunKeysRegistry("bifrost", [keys]);
-    await registry.onModuleInit();
-    const budget = new BudgetService(registry, new SystemClock());
+    const budget = new BudgetService(keys, new SystemClock());
+    await budget.onModuleInit();
     // A fresh endpoint each time: its provider is created, priced, and must work at once.
     const endpointId = randomUUID();
     const runId = `live-test-${String(Date.now())}`;

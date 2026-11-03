@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { CreateEndpoint, RepoSlug } from "@open-macaron/contracts";
-import { LlmBackend } from "../budget/run-keys.ts";
 
 const Secret = z.string().min(20, "looks too short to be a real credential");
 
@@ -37,24 +36,14 @@ const RawEnv = z.object({
   /** open-macaron/knowledge's read API on GitHub Pages (DESIGN.md §6.5). */
   KNOWLEDGE_URL: z.url({ protocol: /^https$/ }).default("https://open-macaron.github.io/knowledge/v1"),
 
-  /** Where new runs get their LLM key. Every backend whose variables are set stays usable for runs minted on it before a switch. */
-  LLM_BACKEND: LlmBackend.default("openrouter"),
-
-  /** OpenRouter backend: configured when OPENROUTER_PROVISIONING_KEY is set. */
-  OPENROUTER_BASE_URL: z.url().default("https://openrouter.ai/api/v1"),
-  /** Workspace (slug) holding every key we create, so its dashboard shows the bot's total spend. */
-  OPENROUTER_WORKSPACE: z.string().regex(/^[a-z0-9-]+$/).default("macaron"),
-  OPENROUTER_PROVISIONING_KEY: Secret.optional(),
-  OPENROUTER_ROUTER_KEY: Secret.optional(),
-
-  /** Bifrost backend (virtual keys over the key of whoever each run is billed to): configured when BIFROST_ADMIN_URL is set. */
-  BIFROST_ADMIN_URL: z.url().optional(),
+  /** Bifrost: every run's key is a virtual key over the key of whoever the run is billed to. Its admin API, internal network only. */
+  BIFROST_ADMIN_URL: z.url(),
   /** What runners use as ANTHROPIC_BASE_URL: the edge's inference-only route to Bifrost. */
-  BIFROST_PUBLIC_URL: z.url({ protocol: /^https$/ }).optional(),
+  BIFROST_PUBLIC_URL: z.url({ protocol: /^https$/ }),
   BIFROST_ADMIN_USERNAME: z.string().min(1).default("macaron"),
-  BIFROST_ADMIN_PASSWORD: Secret.optional(),
+  BIFROST_ADMIN_PASSWORD: Secret,
   /** The pinned list prices (deploy/bifrost/pricing.json, mounted from Bifrost's ConfigMap): each endpoint's provider is priced from it. */
-  LLM_PRICING_FILE: z.string().startsWith("/", "an absolute path").optional(),
+  LLM_PRICING_FILE: z.string().startsWith("/", "an absolute path"),
   /**
    * Requests per minute a run's key may start. Bifrost checks a budget before a request and charges
    * it after, so this bounds how many requests can be in flight past the limit.
@@ -98,13 +87,6 @@ const RawEnv = z.object({
     .optional(),
 });
 
-export interface OpenRouterEnv {
-  readonly baseUrl: string;
-  readonly workspace: string;
-  readonly provisioningKey: string;
-  readonly routerKey: string;
-}
-
 export interface PublishedConfigEnv {
   readonly url: string;
   readonly repoId: number;
@@ -133,38 +115,14 @@ export const Env = RawEnv.transform((raw, ctx) => {
       if (value === undefined) ctx.addIssue({ code: "custom", path: [name], message: `required ${why}` });
     }
   };
-  let openRouter: OpenRouterEnv | undefined;
-  if (raw.OPENROUTER_PROVISIONING_KEY !== undefined || raw.LLM_BACKEND === "openrouter") {
-    missing(
-      { OPENROUTER_PROVISIONING_KEY: raw.OPENROUTER_PROVISIONING_KEY, OPENROUTER_ROUTER_KEY: raw.OPENROUTER_ROUTER_KEY },
-      "for the OpenRouter backend",
-    );
-    if (raw.OPENROUTER_PROVISIONING_KEY !== undefined && raw.OPENROUTER_ROUTER_KEY !== undefined) {
-      openRouter = {
-        baseUrl: raw.OPENROUTER_BASE_URL,
-        workspace: raw.OPENROUTER_WORKSPACE,
-        provisioningKey: raw.OPENROUTER_PROVISIONING_KEY,
-        routerKey: raw.OPENROUTER_ROUTER_KEY,
-      };
-    }
-  }
-  let bifrost: BifrostEnv | undefined;
-  if (raw.BIFROST_ADMIN_URL !== undefined || raw.LLM_BACKEND === "bifrost") {
-    missing(
-      { BIFROST_ADMIN_URL: raw.BIFROST_ADMIN_URL, BIFROST_PUBLIC_URL: raw.BIFROST_PUBLIC_URL, BIFROST_ADMIN_PASSWORD: raw.BIFROST_ADMIN_PASSWORD, LLM_PRICING_FILE: raw.LLM_PRICING_FILE },
-      "for the Bifrost backend",
-    );
-    if (raw.BIFROST_ADMIN_URL !== undefined && raw.BIFROST_PUBLIC_URL !== undefined && raw.BIFROST_ADMIN_PASSWORD !== undefined && raw.LLM_PRICING_FILE !== undefined) {
-      bifrost = {
-        adminUrl: raw.BIFROST_ADMIN_URL,
-        publicUrl: raw.BIFROST_PUBLIC_URL,
-        username: raw.BIFROST_ADMIN_USERNAME,
-        password: raw.BIFROST_ADMIN_PASSWORD,
-        pricingFile: raw.LLM_PRICING_FILE,
-        requestsPerMinute: raw.BIFROST_REQUESTS_PER_MINUTE,
-      };
-    }
-  }
+  const bifrost: BifrostEnv = {
+    adminUrl: raw.BIFROST_ADMIN_URL,
+    publicUrl: raw.BIFROST_PUBLIC_URL,
+    username: raw.BIFROST_ADMIN_USERNAME,
+    password: raw.BIFROST_ADMIN_PASSWORD,
+    pricingFile: raw.LLM_PRICING_FILE,
+    requestsPerMinute: raw.BIFROST_REQUESTS_PER_MINUTE,
+  };
   let publishedConfig: PublishedConfigEnv | undefined;
   if (raw.CONFIG_URL !== undefined || raw.CONFIG_REPO_ID !== undefined) {
     missing({ CONFIG_URL: raw.CONFIG_URL, CONFIG_REPO_ID: raw.CONFIG_REPO_ID }, "for the published configuration");
@@ -180,7 +138,7 @@ export const Env = RawEnv.transform((raw, ctx) => {
       auth = { secret: raw.BETTER_AUTH_SECRET, githubClientId: raw.GITHUB_LOGIN_CLIENT_ID, githubClientSecret: raw.GITHUB_LOGIN_CLIENT_SECRET, adminGithubIds: raw.MACARON_ADMIN_USER_IDS };
     }
   }
-  return { ...raw, openRouter, bifrost, publishedConfig, auth };
+  return { ...raw, bifrost, publishedConfig, auth };
 });
 export type AppEnv = z.output<typeof Env>;
 

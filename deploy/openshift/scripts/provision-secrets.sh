@@ -176,7 +176,6 @@ settings=(
   --from-literal=LOG_LEVEL="${LOG_LEVEL:-info}"
   --from-literal=RUNNER_REPO_ID="$(value RUNNER_REPO_ID)"
   --from-literal=RUNNER_OWNER_ID="$(value RUNNER_OWNER_ID)"
-  --from-literal=LLM_BACKEND=bifrost
   --from-literal=BIFROST_PUBLIC_URL="$PUBLIC_URL/llm/anthropic"
 )
 settings+=(--from-literal=CONFIG_URL="$CONFIG_URL" --from-literal=CONFIG_REPO_ID="$CONFIG_REPO_ID")

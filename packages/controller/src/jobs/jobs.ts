@@ -13,11 +13,11 @@ export const Queue = {
   threadReady: "thread-ready",
   /** A workflow run finished (webhook or reconcile); one job per run, whoever saw it first. */
   runCompleted: "run-completed",
-  /** A finished run's final cost, read ~90 s later (OpenRouter reports usage asynchronously). */
+  /** A finished run's final cost, read ~15 s later (Bifrost reports usage asynchronously). */
   settleCost: "settle-cost",
   /** Periodic: recover workflow_run completions missed during a restart, enforce timeouts. */
   reconcile: "reconcile",
-  /** Periodic: delete leftover `macaron-run-*` OpenRouter keys. */
+  /** Periodic: delete leftover `macaron-run-*` keys, and users' keys left on Bifrost by interrupted mints. */
   sweepKeys: "sweep-keys",
   /** open-macaron/config's Pages deployment succeeded: reload, retried until Pages serves that commit. */
   configPublished: "config-published",

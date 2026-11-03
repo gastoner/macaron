@@ -3,10 +3,9 @@ import { TerminusModule } from "@nestjs/terminus";
 import { BifrostKeys } from "./budget/bifrost-keys.ts";
 import { BudgetService } from "./budget/budget.service.ts";
 import { PriceList } from "./budget/price-list.ts";
-import { OpenRouterKeys } from "./budget/openrouter-keys.ts";
-import { RunKeysRegistry } from "./budget/run-keys.registry.ts";
+import { RunKeys } from "./budget/run-keys.ts";
 import { APP_ENV, type AppEnv } from "./config/env.ts";
-import { configuredModels } from "./config/configured-models.ts";
+import { CONFIGURED_MODELS, configuredModels } from "./config/configured-models.ts";
 import { ConfigSnapshotStore, DrizzleConfigSnapshotStore } from "./config/config-snapshots.store.ts";
 import { ConfigUpdates } from "./config/config-updates.ts";
 import { PublishedConfigClient } from "./config/published-config.client.ts";
@@ -22,7 +21,7 @@ import { EndpointsService, RESOLVE } from "./endpoints/endpoints.service.ts";
 import { resolveAll } from "./endpoints/public-address.ts";
 import { PROBE, probeEndpoint } from "./keys/key-check.ts";
 import { KeyRing } from "./keys/key-ring.ts";
-import { CONFIGURED_MODELS, KEY_RING, LlmKeysService } from "./keys/llm-keys.service.ts";
+import { KEY_RING, LlmKeysService } from "./keys/llm-keys.service.ts";
 import { AdminController } from "./http/admin.controller.ts";
 import { BootstrapController } from "./http/bootstrap.controller.ts";
 import { MeController } from "./http/me.controller.ts";
@@ -77,23 +76,20 @@ export class CoreModule {}
 @Module({
   providers: [
     {
-      provide: RunKeysRegistry,
+      provide: RunKeys,
       inject: [APP_ENV, RepoConfigService],
       useFactory: (env: AppEnv, config: RepoConfigService) => {
-        const registry = new RunKeysRegistry(
-          env.LLM_BACKEND,
-          [...(env.openRouter === undefined ? [] : [new OpenRouterKeys(env.openRouter)]), ...(env.bifrost === undefined ? [] : [new BifrostKeys(env.bifrost, PriceList.fromFile(env.bifrost.pricingFile))])],
-          () => configuredModels(config.snapshot),
-        );
-        // A reloaded configuration naming a model the active backend can't bill is refused as a whole,
+        const keys = new BifrostKeys(env.bifrost, PriceList.fromFile(env.bifrost.pricingFile));
+        // A reloaded configuration naming a model the gateway can't bill is refused as a whole,
         // as at boot, rather than failing every run that would use it.
         config.addCheck(async (snapshot) => {
-          const unpriced = await registry.active.unpriced(configuredModels(snapshot));
-          return unpriced.length === 0 ? [] : [`LLM backend "${registry.activeBackend}" has no price for ${unpriced.join(", ")}`];
+          const unpriced = await keys.unpriced(configuredModels(snapshot));
+          return unpriced.length === 0 ? [] : [`the LLM gateway has no price for ${unpriced.join(", ")}`];
         });
-        return registry;
+        return keys;
       },
     },
+    { provide: CONFIGURED_MODELS, inject: [RepoConfigService], useFactory: (config: RepoConfigService) => () => configuredModels(config.snapshot) },
     BudgetService,
   ],
   exports: [BudgetService],

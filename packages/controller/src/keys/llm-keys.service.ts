@@ -4,6 +4,7 @@ import type { LlmKey, LlmKeyEvents, MyLlmKey, SavedLlmKey, SaveLlmKey } from "@o
 import { and, count, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
 import type { SessionUser } from "../accounts/sessions.service.ts";
 import { Clock } from "../common/clock.ts";
+import { CONFIGURED_MODELS } from "../config/configured-models.ts";
 import { decodeCursor, encodeCursor } from "../common/cursor.ts";
 import { describeError, FieldRefused, FreshSessionRequired, KeyStorageUnavailable, TooManyAttempts } from "../common/errors.ts";
 import type { Upstream } from "../budget/run-keys.ts";
@@ -13,9 +14,6 @@ import { RESOLVE } from "../endpoints/endpoints.service.ts";
 import { publicHostRefusal, type Resolve } from "../endpoints/public-address.ts";
 import { PROBE, type Probe } from "./key-check.ts";
 import { KeyRing, keyAad } from "./key-ring.ts";
-
-/** Every model the live configuration can give a run: what a saved key's endpoint should list. */
-export const CONFIGURED_MODELS = Symbol("CONFIGURED_MODELS");
 
 /** The key ring, or undefined when this deployment has no LLM_KEK_DIR. */
 export const KEY_RING = Symbol("KEY_RING");

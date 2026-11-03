@@ -8,9 +8,8 @@ import { inheritedEnvironment } from "./inputs.ts";
 /** Pinned: the newest release that had matured 3 days when it was chosen (same rule as our dependencies). */
 const CLAUDE_CODE_VERSION = "2.1.296";
 /**
- * OpenRouter refuses a request (402) when its worst case (max_tokens × output price) exceeds
- * what's left on the key. Claude Code asks for 64 000 by default, which a $0.50 key can't cover.
- * Bifrost charges after the request instead, so this also bounds how far one request overshoots.
+ * Bifrost checks a key's budget before a request and charges it after, so this bounds how far one
+ * request overshoots it. Claude Code asks for 64 000 by default, more than a $0.50 key covers.
  */
 const MAX_OUTPUT_TOKENS = "16000";
 
