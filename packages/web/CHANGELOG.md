@@ -1,5 +1,11 @@
 # @open-macaron/web
 
+## 0.7.0
+
+### Minor Changes
+
+- 2d1bd1d: An onboarding dialog over the overview: what macaron-bot is, how it runs on GitHub Actions, the commands you may ask for and where, how to bring a project, where to get help, and your key. `?welcome` opens it until first sign-ins are recorded.
+
 ## 0.6.0
 
 ### Minor Changes
