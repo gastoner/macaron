@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { PRICED } from "./pricing.ts";
 
 const KEY = "sk-ant-api03-e2e-secret-value-1234";
 const WRONG = "sk-ant-api03-wrong-secret-value-9999";
@@ -108,4 +109,34 @@ test("a user sets a monthly cap, sees how much of it is used, and clears it", as
   await page.getByRole("button", { name: "Save cap" }).click();
   await expect(page.getByText("Your monthly cap is cleared")).toBeVisible();
   await expect(page.getByText("No cap", { exact: true })).toBeVisible();
+});
+
+test("a user picks the models their runs use, among the ones the gateway prices", async ({ signIn }) => {
+  const page = await signIn("octocat");
+  await page.goto("/settings/key");
+
+  const defaultModel = page.getByLabel("Default model");
+  const fastModel = page.getByLabel("Fast model");
+  // The priced models, beside the configuration's choice.
+  await expect(defaultModel.locator("option")).toHaveText(["The configuration's default", ...PRICED]);
+
+  const picked = PRICED.at(-1) ?? "";
+  const pickedFast = PRICED.at(0) ?? "";
+  await defaultModel.selectOption(picked);
+  await fastModel.selectOption(pickedFast);
+  await page.getByRole("button", { name: "Save models" }).click();
+  await expect(page.getByText("Your model choices are saved")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Default model")).toHaveValue(picked);
+  await expect(page.getByLabel("Fast model")).toHaveValue(pickedFast);
+
+  // Back to the configuration's choices: blank clears every pick.
+  await page.getByLabel("Default model").selectOption("");
+  await page.getByLabel("Fast model").selectOption("");
+  await page.getByRole("button", { name: "Save models" }).click();
+  await expect(page.getByText("Your model choices are saved")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Default model")).toHaveValue("");
+  await expect(page.getByLabel("Fast model")).toHaveValue("");
 });

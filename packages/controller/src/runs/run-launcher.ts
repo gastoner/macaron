@@ -16,6 +16,7 @@ import { type Asker, capabilityRefusal } from "../accounts/access.ts";
 import { MonthlyCapService, monthStart } from "../accounts/monthly-cap.service.ts";
 import { UsersService } from "../accounts/users.service.ts";
 import { LlmKeysService } from "../keys/llm-keys.service.ts";
+import { ModelPreferencesService } from "../keys/model-preferences.service.ts";
 import { BudgetService, type RunKeyRef } from "../budget/budget.service.ts";
 import type { Route } from "../routing/routes.ts";
 import { decideSettlement, SETTLE_RECHECK_MS } from "../budget/settlement.ts";
@@ -95,6 +96,7 @@ export class RunLauncher {
     private readonly clock: Clock,
     private readonly users: UsersService,
     private readonly keys: LlmKeysService,
+    private readonly preferences: ModelPreferencesService,
     private readonly caps: MonthlyCapService,
     private readonly forks: ForkRegistry,
   ) {}
@@ -104,20 +106,25 @@ export class RunLauncher {
     if ("outcome" in checked) return checked.outcome;
     // Last, as it asks the payer's endpoint: whoever asked pays, on their own key.
     const payer = checked.payer;
-    const resolved = await this.keys.upstreamFor(payer.userId, `${this.env.PUBLIC_URL}/settings/key`);
+    const settings = `${this.env.PUBLIC_URL}/settings/key`;
+    const resolved = await this.keys.upstreamFor(payer.userId, settings);
     if ("refusal" in resolved) return { kind: "refused", reason: resolved.refusal };
     const { upstream } = resolved;
 
     const { config, thread, route, context } = request;
     const mode = route.mode;
+    // The payer's picks come first: one that lost its price refuses the run.
+    const chosen = await this.preferences.resolve(payer.userId, mode, config, settings);
+    if ("refusal" in chosen) return { kind: "refused", reason: chosen.refusal };
+    const { models } = chosen;
     const limitUsd = runLimitUsd(config, mode, context);
     const run = await this.runs.createRun({
       threadId: thread.id,
       ticket: Ticket.parse(`t_${randomBytes(32).toString("base64url")}`),
       mode,
       harness: config.harness,
-      model: config.models[mode] ?? config.model,
-      fastModel: config.fastModel,
+      model: models.model,
+      fastModel: models.fastModel,
       context,
       route,
       limitMicros: toMicros(limitUsd),

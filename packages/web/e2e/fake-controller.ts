@@ -14,6 +14,7 @@ import {
   zGetMeResponse,
   zGetMyLlmKeyEventsResponse,
   zGetMyLlmKeyResponse,
+  zGetMyModelsResponse,
   zGetMyMonthResponse,
   zGetMyUsageResponse,
   zListEndpointsResponse,
@@ -26,12 +27,15 @@ import {
   zSaveMyLlmKeyResponse,
   zSetMyMonthlyCapBody,
   zSetMyMonthlyCapResponse,
+  zSetMyModelsBody,
+  zSetMyModelsResponse,
   zSetEndpointEnabledBody,
   zSetEndpointEnabledResponse,
   zSetUserCapabilitiesBody,
   zSetUserCapabilitiesResponse,
 } from "../src/lib/server/controller/generated/zod.gen.ts";
 import { PORTS } from "./ports.ts";
+import { PRICED } from "./pricing.ts";
 
 type User = z.infer<typeof zListUsersResponse>["users"][number];
 type Invitation = z.infer<typeof zListInvitationsResponse>["invitations"][number];
@@ -41,6 +45,8 @@ type LlmKeyEvent = z.infer<typeof zGetMyLlmKeyEventsResponse>["events"][number];
 type Run = z.infer<typeof zGetMyUsageResponse>["runs"][number];
 type AdminRun = z.infer<typeof zListRunsResponse>["runs"][number];
 type Refusal = z.infer<typeof zListRefusalsResponse>["refusals"][number];
+type Preference = z.infer<typeof zSetMyModelsBody>["preference"];
+
 
 export const SESSION_COOKIE = "__Secure-macaron.session_token";
 const DAY = 86_400_000;
@@ -58,6 +64,8 @@ interface State {
   endpoints: Endpoint[];
   /** By user id. */
   keys: Map<string, LlmKey>;
+  /** Each user's model picks. */
+  preferences: Map<string, Preference>;
   keyEvents: Map<string, LlmKeyEvent[]>;
   /** By user id; absent for no cap. */
   caps: Map<string, number>;
@@ -126,7 +134,7 @@ function fresh(): State {
     { id: randomUUID(), repo: "open-macaron/sandbox", number: 11, kind: "issue", author: "defunkt", authorId: 2, url: "https://github.com/open-macaron/sandbox/issues/11#issuecomment-1", reason: "@defunkt may not ask for implement: an admin grants it on the Users page", createdAt: at(-0.2) },
     { id: randomUUID(), repo: "open-macaron/macaron", number: 12, kind: "pull", author: "octocat", authorId: 583231, url: "https://github.com/open-macaron/macaron/pull/12#issuecomment-2", reason: null, createdAt: at(-3) },
   ];
-  return { users, invitations, endpoints, keys: new Map(), keyEvents: new Map(), caps: new Map(), runs, adminRuns, refusals, onboarded: new Map(users.map((user) => [user.id, user.createdAt])), projectsBroken: false, renewals: 0 };
+  return { users, invitations, endpoints, keys: new Map(), preferences: new Map(), keyEvents: new Map(), caps: new Map(), runs, adminRuns, refusals, onboarded: new Map(users.map((user) => [user.id, user.createdAt])), projectsBroken: false, renewals: 0 };
 }
 
 let state = fresh();
@@ -236,6 +244,16 @@ async function route(request: IncomingMessage): Promise<Reply> {
     });
   }
   if (url.pathname.startsWith("/v1/me/llm-key")) return llmKeyRoute(url, method, user, request);
+  if (url.pathname === "/v1/me/models") {
+    if (method === "PUT") {
+      const { preference } = zSetMyModelsBody.parse(await readJson(request));
+      const refused = (field: string, model: string | undefined): Reply | undefined => (model === undefined || PRICED.includes(model) ? undefined : reply(409, undefined, { error: "field_refused", field, message: `${model} has no pinned price, so a run's budget couldn't cap it.` }));
+      const refusal = refused("model", preference.model) ?? refused("fastModel", preference.fastModel);
+      if (refusal !== undefined) return refusal;
+      state.preferences.set(user.id, preference);
+    }
+    return reply(200, method === "PUT" ? zSetMyModelsResponse : zGetMyModelsResponse, { models: PRICED, preference: state.preferences.get(user.id) ?? {} });
+  }
   if (url.pathname === "/v1/me/month" || url.pathname === "/v1/me/monthly-cap") {
     if (method === "PUT") {
       const { monthlyCapUsd } = zSetMyMonthlyCapBody.parse(await readJson(request));

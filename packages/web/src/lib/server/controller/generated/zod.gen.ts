@@ -136,6 +136,29 @@ export const zGetMyLlmKeyEventsResponse = z.object({
     nextCursor: z.string().nullable()
 });
 
+export const zGetMyModelsResponse = z.object({
+    models: z.array(z.string()),
+    preference: z.object({
+        model: z.string().min(1).max(200).optional(),
+        fastModel: z.string().min(1).max(200).optional()
+    })
+});
+
+export const zSetMyModelsBody = z.object({
+    preference: z.object({
+        model: z.string().min(1).max(200).optional(),
+        fastModel: z.string().min(1).max(200).optional()
+    })
+});
+
+export const zSetMyModelsResponse = z.object({
+    models: z.array(z.string()),
+    preference: z.object({
+        model: z.string().min(1).max(200).optional(),
+        fastModel: z.string().min(1).max(200).optional()
+    })
+});
+
 export const zGetMyMonthResponse = z.object({
     monthlyCapUsd: z.number().gt(0).lte(100000).nullable(),
     spentUsd: z.number().gte(0),

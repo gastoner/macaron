@@ -1,10 +1,10 @@
 import { invalid } from "@sveltejs/kit";
 import { command, form, query } from "$app/server";
 import { z } from "zod";
-import { CapInput, HISTORY_PAGE, KeyInput } from "#lib/keys/forms.js";
+import { CapInput, HISTORY_PAGE, KeyInput, ModelPreferenceInput } from "#lib/keys/forms.js";
 import { requireUser } from "#lib/server/admin/access.js";
 import { controller, errorCode, fieldRefusal, unwrap, unwrapEmpty } from "#lib/server/controller/index.js";
-import { deleteMyLlmKey, getMyLlmKey, getMyLlmKeyEvents, getMyMonth, saveMyLlmKey, setMyMonthlyCap } from "#lib/server/controller/generated/sdk.gen.js";
+import { deleteMyLlmKey, getMyLlmKey, getMyLlmKeyEvents, getMyModels, getMyMonth, saveMyLlmKey, setMyModels, setMyMonthlyCap } from "#lib/server/controller/generated/sdk.gen.js";
 
 /** The signed-in user's key (never the key itself), the endpoints they may pick, and until when they may change it. */
 export const getMyKey = query(async () => {
@@ -45,6 +45,22 @@ export const deleteKey = command(async (): Promise<{ readonly deleted: boolean }
   void getMyKey().refresh();
   void getKeyEvents({ limit: HISTORY_PAGE }).refresh();
   return { deleted: true };
+});
+
+/** The models the gateway prices, and the ones the signed-in user picked. */
+export const getModels = query(async () => {
+  requireUser();
+  return unwrap(await getMyModels({ client: controller() }));
+});
+
+export const setModels = form(ModelPreferenceInput, async (preference, issue) => {
+  requireUser();
+  const result = await setMyModels({ client: controller(), body: { preference } });
+  const refusal = fieldRefusal(result);
+  if (refusal !== undefined) invalid(refusal.field === "fastModel" ? issue.fastModel(refusal.message) : issue.model(refusal.message));
+  const models = unwrap(result);
+  void getModels().refresh();
+  return models;
 });
 
 /** The signed-in user's monthly cap, and what their key was billed this month. */

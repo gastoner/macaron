@@ -14,7 +14,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { Capability, type RunContext } from "@open-macaron/contracts";
+import { Capability, type ModelPreference, type RunContext } from "@open-macaron/contracts";
 import type { Route } from "../routing/routes.ts";
 
 /** Money is stored as integer micro-dollars: no floating point anywhere near a bill. */
@@ -234,6 +234,8 @@ export const users = pgTable("users", {
   capabilities: capability("capabilities").array().notNull().default(sql`'{}'::capability[]`),
   /** What the user's runs may cost each calendar month (UTC), on their key; null for no cap of their own. */
   monthlyCapMicros: usdMicros("monthly_cap_micros"),
+  /** The models the user picked for their runs, each one priced by the gateway; null for none. */
+  modelPreferences: jsonb("model_preferences").$type<ModelPreference>(),
   /** When the user closed the web app's onboarding; null until then, so it opens at their first visit. */
   onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
   createdAt: createdAt(),

@@ -5,12 +5,13 @@ import { z } from "zod";
 
 // Records are the controller's API types, from its generated client. Type-only: erased from the
 // browser bundle, so nothing of the server-only client reaches it.
-import type { GetMyLlmKeyEventsResponse, GetMyLlmKeyResponse, GetMyMonthResponse } from "#lib/server/controller/generated/types.gen.js";
+import type { GetMyLlmKeyEventsResponse, GetMyLlmKeyResponse, GetMyModelsResponse, GetMyMonthResponse } from "#lib/server/controller/generated/types.gen.js";
 
 export type MyLlmKey = GetMyLlmKeyResponse;
 export type LlmKey = NonNullable<MyLlmKey["key"]>;
 export type EndpointChoice = MyLlmKey["endpoints"][number];
 export type MyMonth = GetMyMonthResponse;
+export type MyModels = GetMyModelsResponse;
 export type LlmKeyEvent = GetMyLlmKeyEventsResponse["events"][number];
 
 /** The history's page size: the same arguments on both sides, so a change refreshes the page shown. */
@@ -40,3 +41,13 @@ export const CapInput = z.object({
     .optional()
     .transform((cap) => cap ?? null),
 });
+
+/** A model pick; blank leaves that choice to the configuration. */
+const ModelField = z
+  .string()
+  .trim()
+  .max(200, "A model name is at most 200 characters.")
+  .transform((model) => (model === "" ? undefined : model));
+
+/** The models form's input: the controller's preference, a blank field left out. */
+export const ModelPreferenceInput = z.object({ model: ModelField, fastModel: ModelField });

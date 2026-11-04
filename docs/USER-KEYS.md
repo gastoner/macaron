@@ -55,3 +55,11 @@ flowchart LR
 
 - The run is billed to the account it runs for (#71), recorded on `runs.payer_id`: whoever asked, or for escalations, retries and review bots' comments, whoever asked first. Without a usable key (none saved, rejected, endpoint disabled, unreadable, endpoint unreachable) the run is refused with a reply that says why and links to the key page.
 - A monthly cap per user (calendar month, UTC), optional: a run is refused when what the month was billed to the user, plus the limits of their runs in progress, plus its own limit would pass the cap. The refusal says what's left. Project and repository budgets apply as well.
+
+## 5. Choosing the models (#131)
+
+- The key page's **Models** card offers the models the gateway prices (`deploy/bifrost/pricing.json`), plus a blank choice meaning the configuration's: a run's budget can't cap any other (DESIGN.md, "Bifrost only charges priced models"). Free models come with #132.
+- A user picks a model and a fast model. The preference is `users.model_preferences` (JSONB) and is served by `GET /v1/me/models` and `PUT /v1/me/models`; a pick without a price is refused with the offending field.
+- Precedence at launch: `config.models[mode] ?? preference.model ?? config.model`, so a model the configuration sets for a mode (reviews, tuned for their rules) keeps it; the fast model is `preference.fastModel ?? config.fastModel`. This applies only to runs the user pays for: their own runs, and the escalations, retries and review comments billed to them. A model per mode is a follow-up.
+- A run whose pick lost its price since it was saved is **refused**, not silently run on another model: the refusal links to the key page.
+- Whether the payer's endpoint serves a picked model isn't checked: a model it doesn't serve fails the run at its first call, as a configured one does.

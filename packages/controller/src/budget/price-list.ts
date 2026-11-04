@@ -39,6 +39,11 @@ export class PriceList {
     return patch !== undefined && (patch["input_cost_per_token"] ?? 0) > 0 && (patch["output_cost_per_token"] ?? 0) > 0 ? patch : undefined;
   }
 
+  /** The models a budget can limit, by name. */
+  priced(): string[] {
+    return [...this.patches.keys()].filter((model) => this.patch(model) !== undefined).sort();
+  }
+
   unpriced(models: readonly string[]): string[] {
     return [...new Set(models)].filter((model) => this.patch(model) === undefined);
   }
