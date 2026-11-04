@@ -177,6 +177,19 @@ describe("prompts", () => {
     expect(systemPrompt({ ...context, mode: "retro" }, "/out")).toContain("This repository has no lessons yet.");
   });
 
+  it("ask reproduce and verify to end their answer with a verdict in their own words", async () => {
+    const context = RunContext.parse(JSON.parse(await readFile(paths(inputs).contextFile, "utf8")));
+
+    const verify = systemPrompt({ ...context, mode: "verify" }, "/out");
+    expect(verify).toContain("`### Verdict`");
+    expect(verify).toContain("❌ **Not verified**, you checked it and it doesn't");
+    expect(verify).toContain("⚠️ **Partially verified**");
+    const reproduce = systemPrompt({ ...context, mode: "reproduce" }, "/out");
+    expect(reproduce).toContain("✅ **Reproduced**, you checked it and it holds");
+    expect(reproduce).toContain("⚠️ **Could not reproduce here**");
+    expect(systemPrompt(context, "/out")).not.toContain("### Verdict");
+  });
+
   it("tell the agent its platform, and triage where it may escalate to", async () => {
     const context = RunContext.parse(JSON.parse(await readFile(paths(inputs).contextFile, "utf8")));
 

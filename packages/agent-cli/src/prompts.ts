@@ -2,6 +2,25 @@ import { allowedActions, type Mode, type Platform, RunResult, type RunContext } 
 import { z } from "zod";
 import type { RuleFile } from "./skills.ts";
 
+/**
+ * How a reproduce or verify answer ends. Without it, "Verified" opened answers whose scenario couldn't
+ * run, and the bugs found sat among the notes: the verdict is what a maintainer reads first.
+ */
+function verdict(words: { pass: string; fail: string; partial: string; none: string; example: string }): string {
+  return `
+
+End \`message\` with a \`### Verdict\` section, its first line the overall verdict: a symbol, its words in bold, then one sentence (\`✅ **${words.pass}**: …\`).
+- ✅ **${words.pass}**, you checked it and it holds.
+- ❌ **${words.fail}**, you checked it and it doesn't (a bug, a regression, or the change doesn't do what it says).
+- ⚠️ **${words.partial}** (some of it couldn't be checked here) or ⚠️ **${words.none}** (none of it could), saying in a few words what this environment lacks (a platform, hardware, credentials, a service).
+When the trigger, or the pull request and its issue, ask about several distinct things, list them under that line, one claim each in the order they were asked, with its own symbol:
+\`\`\`md
+### Verdict
+${words.example}
+\`\`\`
+The overall verdict is the worst item: any ❌ makes it ❌, otherwise any ⚠️ makes it ⚠️. Items are the claims you were asked to check, at most 6, not your steps: a check you skipped (unit tests not run, another theme) is not an item; mention it in the body if it matters. Something you noticed that the request isn't about goes in an "Other observations" paragraph above the verdict, never in it. Don't open \`message\` with a verdict word: start with what you ran and where (commit, platform). Start \`summary\` with the overall verdict line.`;
+}
+
 const MODE_INSTRUCTIONS: Readonly<Record<Mode, string>> = {
   triage:
     "Decide what the trigger needs, cheaply. Do not set up the project or change files. If it is a question you can answer from the code and the thread, answer it (`reply`, or `replies` to specific comments). If real work is needed, `escalate` with `escalateTo` = `plan`, `implement`, `reproduce` or `address_review`. If the request is unclear, `ask` one precise question.",
@@ -11,9 +30,24 @@ const MODE_INSTRUCTIONS: Readonly<Record<Mode, string>> = {
   address_review:
     "Address the review comments on the pull request (`reviewComments`). Change the code where the reviewer is right; reply to each comment you address or disagree with, using `replies` with its `inReplyTo` id. Build and test before finishing. Finish with `commit` if you changed files, `reply` otherwise.",
   reproduce:
-    "Try to reproduce the reported problem with the repository's own tooling (its build, its tests, its end-to-end setup, e.g. Playwright). Capture evidence: the commands you ran and their output, and screenshots or a video with `macaron-agent attach` when the environment can show the application (see its section below). Do not change the project's files. Report with action `reply`: whether it reproduces, how, and the evidence. If you can't reproduce, or this environment can't show the problem, say so and what you tried.",
+    "Try to reproduce the reported problem with the repository's own tooling (its build, its tests, its end-to-end setup, e.g. Playwright). Capture evidence: the commands you ran and their output, and screenshots or a video with `macaron-agent attach` when the environment can show the application (see its section below). Do not change the project's files. Report with action `reply`: how you tried, what happened, and the evidence. If this environment can't show the problem, say what you tried." +
+    verdict({
+      pass: "Reproduced",
+      fail: "Not reproduced",
+      partial: "Partially reproduced",
+      none: "Could not reproduce here",
+      example: "⚠️ **Partially reproduced**\n- ✅ The `.env` tab is shown as plain text\n- ⚠️ The same file on Windows: this runner is Linux",
+    }) +
+    " ❌ means you tried and the behaviour was correct; ✅ means the reported problem is real.",
   verify:
-    "Verify that the change on this branch does what it should: what the trigger asks you to check, otherwise what the pull request and its linked issue describe. Use the repository's own tooling. Capture evidence: the commands you ran and their output, and screenshots or a video with `macaron-agent attach` when the environment can show the application (see its section below). Do not change files. Report with action `reply`: what you checked, what you found, and the evidence. If this environment can't show it, say so and what you tried.",
+    "Verify that the change on this branch does what it should: what the trigger asks you to check, otherwise what the pull request and its linked issue describe. Use the repository's own tooling. Capture evidence: the commands you ran and their output, and screenshots or a video with `macaron-agent attach` when the environment can show the application (see its section below). Do not change files. Report with action `reply`: what you checked, what you found, and the evidence. If this environment can't show it, say what you tried." +
+    verdict({
+      pass: "Verified",
+      fail: "Not verified",
+      partial: "Partially verified",
+      none: "Could not verify",
+      example: "❌ **Not verified**\n- ✅ Update Image appears in the image's menu and runs without error\n- ❌ The confirmation reads `alpine.10` instead of `alpine:3.10`\n- ⚠️ Pulling a newer digest: the only image here has a frozen tag",
+    }),
   retro:
     "A trusted user asked you to remember something for future work on this project (the trigger, `remember: …`). Check the claim against the code, the thread and the existing lessons. Then propose it as `learnings`, each a complete lesson future runs will load as a skill: `topic`; `description` (what it covers and when it matters, front-loading the words a future task would match, at most 1024 characters); `text` (the lesson in concise Markdown: the facts, and how to check them again); `evidence` (the trigger's URL, or a better source you found); `scope` (`project` by default: every repository of the project; `repo` only for facts about this repository's own code; `global` for what holds in any project). Revise rather than duplicate: when an existing lesson covers the topic, load it and set `updates` to its id, with its whole revised text. Leave out what the code or its documentation already says plainly. If the claim is wrong or can't be checked, propose nothing and explain why in `summary`. Do not change files. Action `noop`; `summary` says what you proposed.",
   review:
