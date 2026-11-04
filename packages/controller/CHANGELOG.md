@@ -1,5 +1,17 @@
 # @open-macaron/controller
 
+## 0.15.0
+
+### Minor Changes
+
+- 5d473ba: Users pick the models their runs use on the key page: a model and a fast model, among the models the gateway prices. Their picks replace the configuration's defaults for the runs they pay for, but not a model the configuration sets for a mode; a pick that loses its price refuses the run and points at the key page.
+
+### Patch Changes
+
+- Updated dependencies [5d473ba]
+  - @open-macaron/contracts@0.13.0
+  - @open-macaron/review@0.3.13
+
 ## 0.14.0
 
 ### Minor Changes
