@@ -1,5 +1,17 @@
 # @open-macaron/agent-cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 005ca3a: `reproduce` and `verify` answers end with a Verdict: an overall ✅ / ❌ / ⚠️ line in fixed words (Verified, Not verified, Partially verified, Could not verify; Reproduced, Not reproduced, …), then one line per claim when several were asked.
+
+### Patch Changes
+
+- Updated dependencies [5d473ba]
+  - @open-macaron/contracts@0.13.0
+  - @open-macaron/review@0.3.13
+
 ## 0.2.1
 
 ### Patch Changes
