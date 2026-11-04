@@ -262,6 +262,73 @@ export type GetMyLlmKeyEventsResponses = {
 
 export type GetMyLlmKeyEventsResponse = GetMyLlmKeyEventsResponses[keyof GetMyLlmKeyEventsResponses];
 
+export type GetMyModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/me/models';
+};
+
+export type GetMyModelsErrors = {
+    /**
+     * No valid session
+     */
+    401: unknown;
+};
+
+export type GetMyModelsResponses = {
+    200: {
+        models: Array<string>;
+        preference: {
+            model?: string;
+            fastModel?: string;
+        };
+    };
+};
+
+export type GetMyModelsResponse = GetMyModelsResponses[keyof GetMyModelsResponses];
+
+export type SetMyModelsData = {
+    body: {
+        preference: {
+            model?: string;
+            fastModel?: string;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/me/models';
+};
+
+export type SetMyModelsErrors = {
+    /**
+     * No valid session
+     */
+    401: unknown;
+    /**
+     * A pick has no pinned price
+     */
+    409: {
+        error: string;
+        field: string;
+        message: string;
+    };
+};
+
+export type SetMyModelsError = SetMyModelsErrors[keyof SetMyModelsErrors];
+
+export type SetMyModelsResponses = {
+    200: {
+        models: Array<string>;
+        preference: {
+            model?: string;
+            fastModel?: string;
+        };
+    };
+};
+
+export type SetMyModelsResponse = SetMyModelsResponses[keyof SetMyModelsResponses];
+
 export type GetMyMonthData = {
     body?: never;
     path?: never;

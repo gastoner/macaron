@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
-import type { ApproveEndpointData, ApproveEndpointErrors, ApproveEndpointResponses, CompleteMyOnboardingData, CompleteMyOnboardingErrors, CompleteMyOnboardingResponses, CreateInvitationData, CreateInvitationErrors, CreateInvitationResponses, DeleteMyLlmKeyData, DeleteMyLlmKeyErrors, DeleteMyLlmKeyResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyLlmKeyData, GetMyLlmKeyErrors, GetMyLlmKeyEventsData, GetMyLlmKeyEventsErrors, GetMyLlmKeyEventsResponses, GetMyLlmKeyResponses, GetMyMonthData, GetMyMonthErrors, GetMyMonthResponses, GetMyUsageData, GetMyUsageErrors, GetMyUsageResponses, ListEndpointsData, ListEndpointsResponses, ListInvitationsData, ListInvitationsErrors, ListInvitationsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRefusalsData, ListRefusalsErrors, ListRefusalsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListUsersData, ListUsersResponses, RevokeInvitationData, RevokeInvitationResponses, SaveMyLlmKeyData, SaveMyLlmKeyErrors, SaveMyLlmKeyResponses, SetEndpointEnabledData, SetEndpointEnabledErrors, SetEndpointEnabledResponses, SetMyMonthlyCapData, SetMyMonthlyCapErrors, SetMyMonthlyCapResponses, SetUserCapabilitiesData, SetUserCapabilitiesErrors, SetUserCapabilitiesResponses } from './types.gen.ts';
-import { zApproveEndpointBody, zApproveEndpointResponse, zCompleteMyOnboardingResponse, zCreateInvitationBody, zCreateInvitationResponse, zDeleteMyLlmKeyResponse, zGetMeResponse, zGetMyLlmKeyEventsQuery, zGetMyLlmKeyEventsResponse, zGetMyLlmKeyResponse, zGetMyMonthResponse, zGetMyUsageQuery, zGetMyUsageResponse, zListEndpointsResponse, zListInvitationsResponse, zListProjectsQuery, zListProjectsResponse, zListRefusalsQuery, zListRefusalsResponse, zListRunsQuery, zListRunsResponse, zListUsersResponse, zRevokeInvitationPath, zRevokeInvitationResponse, zSaveMyLlmKeyBody, zSaveMyLlmKeyResponse, zSetEndpointEnabledBody, zSetEndpointEnabledPath, zSetEndpointEnabledResponse, zSetMyMonthlyCapBody, zSetMyMonthlyCapResponse, zSetUserCapabilitiesBody, zSetUserCapabilitiesPath, zSetUserCapabilitiesResponse } from './zod.gen.ts';
+import type { ApproveEndpointData, ApproveEndpointErrors, ApproveEndpointResponses, CompleteMyOnboardingData, CompleteMyOnboardingErrors, CompleteMyOnboardingResponses, CreateInvitationData, CreateInvitationErrors, CreateInvitationResponses, DeleteMyLlmKeyData, DeleteMyLlmKeyErrors, DeleteMyLlmKeyResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyLlmKeyData, GetMyLlmKeyErrors, GetMyLlmKeyEventsData, GetMyLlmKeyEventsErrors, GetMyLlmKeyEventsResponses, GetMyLlmKeyResponses, GetMyModelsData, GetMyModelsErrors, GetMyModelsResponses, GetMyMonthData, GetMyMonthErrors, GetMyMonthResponses, GetMyUsageData, GetMyUsageErrors, GetMyUsageResponses, ListEndpointsData, ListEndpointsResponses, ListInvitationsData, ListInvitationsErrors, ListInvitationsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRefusalsData, ListRefusalsErrors, ListRefusalsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListUsersData, ListUsersResponses, RevokeInvitationData, RevokeInvitationResponses, SaveMyLlmKeyData, SaveMyLlmKeyErrors, SaveMyLlmKeyResponses, SetEndpointEnabledData, SetEndpointEnabledErrors, SetEndpointEnabledResponses, SetMyModelsData, SetMyModelsErrors, SetMyModelsResponses, SetMyMonthlyCapData, SetMyMonthlyCapErrors, SetMyMonthlyCapResponses, SetUserCapabilitiesData, SetUserCapabilitiesErrors, SetUserCapabilitiesResponses } from './types.gen.ts';
+import { zApproveEndpointBody, zApproveEndpointResponse, zCompleteMyOnboardingResponse, zCreateInvitationBody, zCreateInvitationResponse, zDeleteMyLlmKeyResponse, zGetMeResponse, zGetMyLlmKeyEventsQuery, zGetMyLlmKeyEventsResponse, zGetMyLlmKeyResponse, zGetMyModelsResponse, zGetMyMonthResponse, zGetMyUsageQuery, zGetMyUsageResponse, zListEndpointsResponse, zListInvitationsResponse, zListProjectsQuery, zListProjectsResponse, zListRefusalsQuery, zListRefusalsResponse, zListRunsQuery, zListRunsResponse, zListUsersResponse, zRevokeInvitationPath, zRevokeInvitationResponse, zSaveMyLlmKeyBody, zSaveMyLlmKeyResponse, zSetEndpointEnabledBody, zSetEndpointEnabledPath, zSetEndpointEnabledResponse, zSetMyModelsBody, zSetMyModelsResponse, zSetMyMonthlyCapBody, zSetMyMonthlyCapResponse, zSetUserCapabilitiesBody, zSetUserCapabilitiesPath, zSetUserCapabilitiesResponse } from './zod.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -156,6 +156,48 @@ export const getMyLlmKeyEvents = <ThrowOnError extends boolean = false>(options?
         }],
     url: '/v1/me/llm-key/events',
     ...options
+});
+
+/**
+ * The models the gateway prices, and the ones the signed-in user picked
+ */
+export const getMyModels = <ThrowOnError extends boolean = false>(options?: Options<GetMyModelsData, ThrowOnError>): RequestResult<GetMyModelsResponses, GetMyModelsErrors, ThrowOnError> => (options?.client ?? client).get<GetMyModelsResponses, GetMyModelsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGetMyModelsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Secure-macaron.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/me/models',
+    ...options
+});
+
+/**
+ * Store the models the signed-in user's runs use, among the ones the gateway prices
+ */
+export const setMyModels = <ThrowOnError extends boolean = false>(options: Options<SetMyModelsData, ThrowOnError>): RequestResult<SetMyModelsResponses, SetMyModelsErrors, ThrowOnError> => (options.client ?? client).put<SetMyModelsResponses, SetMyModelsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zSetMyModelsBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zSetMyModelsResponse.parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: '__Secure-macaron.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/me/models',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

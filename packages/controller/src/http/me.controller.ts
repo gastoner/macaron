@@ -10,11 +10,14 @@ import {
   Me as MeSchema,
   type MyLlmKey,
   MyLlmKey as MyLlmKeySchema,
+  type MyModels,
+  MyModels as MyModelsSchema,
   type MyMonth,
   MyMonth as MyMonthSchema,
   type SavedLlmKey,
   SavedLlmKey as SavedLlmKeySchema,
   SaveLlmKey,
+  SaveModelPreference,
   SetMonthlyCap,
   type UsagePage,
   UsagePage as UsagePageSchema,
@@ -27,6 +30,7 @@ import { UsageService } from "../accounts/usage.service.ts";
 import { UsersService } from "../accounts/users.service.ts";
 import { SignInRequired } from "../common/errors.ts";
 import { LlmKeysService } from "../keys/llm-keys.service.ts";
+import { ModelPreferencesService } from "../keys/model-preferences.service.ts";
 
 /** The signed-in user's own data. Reached only by the web app (the edge never routes /v1/me). */
 @ApiTags("me")
@@ -38,6 +42,7 @@ export class MeController {
     private readonly users: UsersService,
     private readonly usage: UsageService,
     private readonly keys: LlmKeysService,
+    private readonly preferences: ModelPreferencesService,
     private readonly caps: MonthlyCapService,
   ) {}
 
@@ -112,6 +117,25 @@ export class MeController {
   async myLlmKeyEvents(@Req() request: Request, @Query({ schema: LlmKeyEventsQuery }) query: LlmKeyEventsQuery): Promise<LlmKeyEvents> {
     const user = await this.sessions.user(request.headers);
     return this.keys.events(user.id, query.limit, query.before);
+  }
+
+  @Get("models")
+  @ApiOperation({ operationId: "getMyModels", summary: "The models the gateway prices, and the ones the signed-in user picked" })
+  @ApiResponse({ status: 200, standardSchema: MyModelsSchema })
+  @ApiResponse({ status: 401, description: "No valid session" })
+  async myModels(@Req() request: Request): Promise<MyModels> {
+    const user = await this.sessions.user(request.headers);
+    return this.preferences.mine(user.id);
+  }
+
+  @Put("models")
+  @ApiOperation({ operationId: "setMyModels", summary: "Store the models the signed-in user's runs use, among the ones the gateway prices" })
+  @ApiResponse({ status: 200, standardSchema: MyModelsSchema })
+  @ApiResponse({ status: 401, description: "No valid session" })
+  @ApiResponse({ status: 409, standardSchema: FieldError, description: "A pick has no pinned price" })
+  async setMyModels(@Req() request: Request, @Body({ schema: SaveModelPreference }) body: SaveModelPreference): Promise<MyModels> {
+    const user = await this.sessions.user(request.headers);
+    return this.preferences.save(user.id, body.preference);
   }
 
   @Get("month")

@@ -22,6 +22,7 @@ import { resolveAll } from "./endpoints/public-address.ts";
 import { PROBE, probeEndpoint } from "./keys/key-check.ts";
 import { KeyRing } from "./keys/key-ring.ts";
 import { KEY_RING, LlmKeysService } from "./keys/llm-keys.service.ts";
+import { ModelPreferencesService } from "./keys/model-preferences.service.ts";
 import { AdminController } from "./http/admin.controller.ts";
 import { BootstrapController } from "./http/bootstrap.controller.ts";
 import { MeController } from "./http/me.controller.ts";
@@ -128,13 +129,15 @@ export class ReviewModule {}
     ActivityService,
     EndpointsService,
     LlmKeysService,
+    ModelPreferencesService,
     MonthlyCapService,
+    { provide: PriceList, inject: [APP_ENV], useFactory: (env: AppEnv) => PriceList.fromFile(env.bifrost.pricingFile) },
     { provide: RESOLVE, useValue: resolveAll },
     { provide: PROBE, useValue: probeEndpoint },
     { provide: CONFIGURED_MODELS, inject: [RepoConfigService], useFactory: (config: RepoConfigService) => () => configuredModels(config.snapshot) },
     { provide: KEY_RING, inject: [APP_ENV], useFactory: (env: AppEnv) => (env.LLM_KEK_DIR === undefined ? undefined : KeyRing.fromDirectory(env.LLM_KEK_DIR)) },
   ],
-  exports: [InvitationsService, SessionsService, UsersService, UsageService, ActivityService, EndpointsService, LlmKeysService, MonthlyCapService],
+  exports: [InvitationsService, SessionsService, UsersService, UsageService, ActivityService, EndpointsService, LlmKeysService, ModelPreferencesService, MonthlyCapService],
 })
 export class AccountsModule {}
 

@@ -13,7 +13,8 @@
   import DeleteKey from "./delete-key.svelte";
   import KeyDialog from "./key-dialog.svelte";
   import KeyHistory from "./key-history.svelte";
-  import { getMonth, getMyKey } from "./key.remote.ts";
+  import { getModels, getMonth, getMyKey } from "./key.remote.ts";
+  import ModelPreference from "./model-preference.svelte";
   import MonthlyCap from "./monthly-cap.svelte";
 
   // Bumped after a change: the history starts again from its newest page.
@@ -109,6 +110,22 @@
     <Empty.Root>
       <Empty.Header>
         <Empty.Title>Your key could not be loaded</Empty.Title>
+        <Empty.Description>{error instanceof Error ? error.message : "Try again in a moment."}</Empty.Description>
+      </Empty.Header>
+      <Empty.Content><Button variant="outline" onclick={reset}>Try again</Button></Empty.Content>
+    </Empty.Root>
+  {/snippet}
+</svelte:boundary>
+
+<svelte:boundary>
+  <ModelPreference models={await getModels()} />
+  {#snippet pending()}
+    <Card.Root><Card.Content class="grid gap-3"><Skeleton class="h-5 w-32" /><Skeleton class="h-9 w-full" /></Card.Content></Card.Root>
+  {/snippet}
+  {#snippet failed(error, reset)}
+    <Empty.Root>
+      <Empty.Header>
+        <Empty.Title>Your models could not be loaded</Empty.Title>
         <Empty.Description>{error instanceof Error ? error.message : "Try again in a moment."}</Empty.Description>
       </Empty.Header>
       <Empty.Content><Button variant="outline" onclick={reset}>Try again</Button></Empty.Content>
