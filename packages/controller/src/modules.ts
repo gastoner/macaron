@@ -137,7 +137,7 @@ export class ReviewModule {}
     { provide: CONFIGURED_MODELS, inject: [RepoConfigService], useFactory: (config: RepoConfigService) => () => configuredModels(config.snapshot) },
     { provide: KEY_RING, inject: [APP_ENV], useFactory: (env: AppEnv) => (env.LLM_KEK_DIR === undefined ? undefined : KeyRing.fromDirectory(env.LLM_KEK_DIR)) },
   ],
-  exports: [InvitationsService, SessionsService, UsersService, UsageService, ActivityService, EndpointsService, LlmKeysService, ModelPreferencesService, MonthlyCapService],
+  exports: [InvitationsService, SessionsService, UsersService, UsageService, ActivityService, EndpointsService, LlmKeysService, ModelPreferencesService, MonthlyCapService, PriceList],
 })
 export class AccountsModule {}
 

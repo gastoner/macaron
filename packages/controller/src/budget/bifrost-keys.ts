@@ -5,11 +5,17 @@ import type { BifrostEnv } from "../config/env.ts";
 import type { AddProviderRequest, CreatePricingOverrideRequest, CreateVirtualKeyData, Key, UpdateVirtualKeyData } from "../generated/bifrost/types.gen.ts";
 import { zKey, zListPricingOverridesResponse, zProviderResponse, zVirtualKey } from "../generated/bifrost/zod.gen.ts";
 import type { PriceList, PricePatch } from "./price-list.ts";
-import { type KeyStatus, type ProvisionedKey, RunKeys, type Upstream } from "./run-keys.ts";
+import { type KeyStatus, type ProvisionedKey, RunKeys, type RunLimits, type TokenUsage, type Upstream } from "./run-keys.ts";
 
 /** Only the fields we use: the rest of Bifrost's objects can change without breaking us. */
 const CreatedKey = z.object({ virtual_key: zVirtualKey.pick({ id: true, value: true }) });
 const KeyBudgets = z.object({ virtual_key: zVirtualKey.pick({ budgets: true }) });
+/** Only the token counter of a key's rate limit: the rest of Bifrost's object can change freely. */
+const KeyTokens = z.object({
+  virtual_key: z.object({
+    rate_limit: z.object({ token_max_limit: z.coerce.number().optional(), token_current_usage: z.coerce.number() }).optional(),
+  }),
+});
 const KeyBinding = z.object({ virtual_key: z.object({ name: z.string(), provider_configs: z.array(z.object({ provider: z.string() })).nullish() }) });
 const ListedKey = zVirtualKey.pick({ id: true, name: true, is_active: true, created_at: true });
 /** An empty page has `virtual_keys: null` (Go's nil slice), unlike the OpenAPI document says. */
@@ -78,7 +84,7 @@ export class BifrostKeys extends RunKeys {
     return Promise.resolve(this.prices.unpriced(models));
   }
 
-  async create(name: string, limitUsd: number, expiresAt: Date, models: readonly string[], upstream: Upstream): Promise<ProvisionedKey> {
+  async create(name: string, limits: RunLimits, expiresAt: Date, models: readonly string[], upstream: Upstream): Promise<ProvisionedKey> {
     const allowed = [...new Set(models)];
     const unpriced = this.prices.unpriced(allowed);
     if (unpriced.length > 0) throw new UpstreamError("bifrost", `no price for ${unpriced.join(", ")}: refusing a key its budget can't limit`, undefined);
@@ -98,8 +104,14 @@ export class BifrostKeys extends RunKeys {
       const body: CreateVirtualKeyData["body"] = {
         name,
         provider_configs: [{ provider, allowed_models: allowed, key_ids: [keyId] }],
-        budgets: [{ max_limit: limitUsd, reset_duration: BUDGET_RESET }],
-        rate_limit: { request_max_limit: this.settings.requestsPerMinute, request_reset_duration: "1m" },
+        budgets: [{ max_limit: limits.usd, reset_duration: BUDGET_RESET }],
+        rate_limit: {
+          request_max_limit: this.settings.requestsPerMinute,
+          request_reset_duration: "1m",
+          // Bifrost checks the limit before a request and counts tokens after it, cache reads
+          // included: each request in flight can overshoot by its own size. The window outlives the key.
+          ...(limits.tokens === undefined ? {} : { token_max_limit: limits.tokens, token_reset_duration: BUDGET_RESET }),
+        },
         expires_at: expiresAt.toISOString(),
         // Settlement reads the spend after the run; the sweeper deletes the key afterwards.
         delete_after_expire: false,
@@ -171,6 +183,20 @@ export class BifrostKeys extends RunKeys {
   async spentSince(hash: string, _since: Date): Promise<number> {
     const key = await this.request("read key usage", "GET", `/api/governance/virtual-keys/${encodeURIComponent(hash)}?from_memory=true`, KeyBudgets);
     return (key.virtual_key.budgets ?? []).reduce((total, budget) => total + budget.current_usage, 0);
+  }
+
+  /** The key's token counter and its cap; a key without one, or already deleted, has none. */
+  async tokenUsage(hash: string): Promise<TokenUsage | undefined> {
+    try {
+      const key = await this.request("read key tokens", "GET", `/api/governance/virtual-keys/${encodeURIComponent(hash)}?from_memory=true`, KeyTokens);
+      const rate = key.virtual_key.rate_limit;
+      return rate?.token_max_limit === undefined ? undefined : { used: rate.token_current_usage, limit: rate.token_max_limit };
+    } catch (error: unknown) {
+      // Settlement deletes a key once its cost is final: a completion arriving after that (a
+      // delivery can lag by minutes) still names the generic failure.
+      if (error instanceof UpstreamError && error.status === 404) return undefined;
+      throw error;
+    }
   }
 
   /** Creates the endpoint's provider when it's missing; an existing one must point at the same base URL. */
