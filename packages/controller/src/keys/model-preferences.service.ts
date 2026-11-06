@@ -30,7 +30,7 @@ export class ModelPreferencesService {
 
   /** What the user may pick, and what they picked. */
   async mine(userId: string): Promise<MyModels> {
-    return { models: this.prices.priced(), free: this.prices.free(), preference: await this.preference(userId) };
+    return { models: this.prices.billable(), free: this.prices.free(), preference: await this.preference(userId) };
   }
 
   /** Stores the picks, all of them billable, or refuses the one that isn't. */

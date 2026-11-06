@@ -31,12 +31,12 @@ describe("PriceList", () => {
     expect(prices.runTokens("rits/zai-org/glm-5-3")).toBe(50_000_000);
     expect(prices.isFree("rits/zai-org/glm-5-3")).toBe(true);
     expect(prices.runTokens("claude-sonnet-5-5")).toBeUndefined();
-    expect(prices.priced()).toContain("rits/zai-org/glm-5-3");
+    expect(prices.billable()).toContain("rits/zai-org/glm-5-3");
   });
 
-  it("calls unpriced a model it doesn't list, or lists without both prices", () => {
+  it("calls unbillable a model it doesn't list, or lists without both prices", () => {
     const prices = PriceList.of(new Map([["half", { input_cost_per_token: 1e-6 }], ["full", { input_cost_per_token: 1e-6, output_cost_per_token: 5e-6 }]]));
-    expect(prices.unpriced(["full", "half", "missing", "full"])).toEqual(["half", "missing"]);
+    expect(prices.unbillable(["full", "half", "missing", "full"])).toEqual(["half", "missing"]);
   });
 
   it("bills a zero-priced model only when it is marked free", () => {
@@ -48,15 +48,16 @@ describe("PriceList", () => {
       ]),
       new Map([["marked", 1_000]]),
     );
-    expect(prices.unpriced(["marked", "forgotten"])).toEqual(["forgotten"]);
+    expect(prices.unbillable(["marked", "forgotten"])).toEqual(["forgotten"]);
     expect(prices.isFree("marked")).toBe(true);
     expect(prices.runTokens("marked")).toBe(1_000);
     expect(prices.isFree("forgotten")).toBe(false);
   });
 
   it("refuses a malformed free mark, saying what is wrong", () => {
-    expect(() => listOf({ m: { free: true, input_cost_per_token: 1e-6, output_cost_per_token: 0, max_run_tokens: 1_000 } })).toThrow(/marked free but has a price/);
-    expect(() => listOf({ m: { free: true, max_run_tokens: 1_000 } })).toThrow(/without input_cost_per_token and output_cost_per_token set to 0/);
-    expect(() => listOf({ m: { free: true, input_cost_per_token: 0, output_cost_per_token: 0 } })).toThrow(/without a valid max_run_tokens/);
+    expect(() => listOf({ m: { free: true, input_cost_per_token: 1e-6, output_cost_per_token: 0, max_run_tokens: 1_000 } })).toThrow(/m has an invalid free mark.*input_cost_per_token/s);
+    expect(() => listOf({ m: { free: true, max_run_tokens: 1_000 } })).toThrow(/invalid free mark.*output_cost_per_token/s);
+    expect(() => listOf({ m: { free: true, input_cost_per_token: 0, output_cost_per_token: 0 } })).toThrow(/invalid free mark.*max_run_tokens/s);
+    expect(() => listOf({ m: { free: false, input_cost_per_token: 0, output_cost_per_token: 0, max_run_tokens: 1_000 } })).toThrow(/invalid free mark.*free/s);
   });
 });

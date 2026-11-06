@@ -37,11 +37,11 @@ export class BudgetService implements OnModuleInit, OnApplicationBootstrap {
   /**
    * Refuses to start when a configured model can't be billed: every run would otherwise fail at
    * launch. A reloaded configuration goes through the same check (registered on RepoConfigService);
-   * minting still refuses an unpriced model.
+   * minting still refuses an unbillable model.
    */
   async onApplicationBootstrap(): Promise<void> {
-    const unpriced = await this.keys.unpriced(this.configuredModels());
-    if (unpriced.length > 0) throw new Error(`the LLM gateway has no price for configured models: ${unpriced.join(", ")}`);
+    const unbillable = await this.keys.unbillable(this.configuredModels());
+    if (unbillable.length > 0) throw new Error(`the LLM gateway has no price or free mark for configured models: ${unbillable.join(", ")}`);
   }
 
   /**

@@ -22,7 +22,11 @@ export function runLimitTokens(models: readonly string[], runTokens: (model: str
   return ceilings.length === 0 ? undefined : Math.min(...ceilings);
 }
 
-/** The fact of a run whose key reached its token cap, for a failure the thread can act on. */
-export function tokenBudgetExhausted(usage: TokenUsage): string {
+/**
+ * Why a run whose key reached its token cap stopped, for a failure the thread can act on; nothing
+ * for a key under its cap, or without one.
+ */
+export function tokenBudgetExhausted(usage: TokenUsage | undefined): string | undefined {
+  if (usage === undefined || usage.used < usage.limit) return undefined;
   return `its token budget was exhausted (${String(usage.used)} of ${String(usage.limit)} tokens)`;
 }

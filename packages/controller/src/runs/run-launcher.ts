@@ -18,7 +18,6 @@ import { UsersService } from "../accounts/users.service.ts";
 import { LlmKeysService } from "../keys/llm-keys.service.ts";
 import { ModelPreferencesService } from "../keys/model-preferences.service.ts";
 import { BudgetService, type RunKeyRef } from "../budget/budget.service.ts";
-import type { TokenUsage } from "../budget/run-keys.ts";
 import { PriceList } from "../budget/price-list.ts";
 import type { Route } from "../routing/routes.ts";
 import { decideSettlement, SETTLE_RECHECK_MS } from "../budget/settlement.ts";
@@ -76,6 +75,11 @@ function keyOf(run: RunRecord): RunKeyRef | undefined {
   return run.keyHash === null ? undefined : { hash: run.keyHash };
 }
 
+/** The models a run's key allows, fixed at launch: its token cap and its settlement follow from them. */
+function keyModels(run: Pick<RunRecord, "model" | "fastModel">): readonly string[] {
+  return [run.model, run.fastModel ?? run.model];
+}
+
 /**
  * A run's whole life: launch (caps → key → dispatch), bootstrap (OIDC → one-time key hand-over),
  * completion (settle cost → artifact → Gate → publish) and abort. Every money decision is here.
@@ -121,7 +125,6 @@ export class RunLauncher {
     if ("refusal" in chosen) return { kind: "refused", reason: chosen.refusal };
     const { models } = chosen;
     const limitUsd = runLimitUsd(config, mode, context);
-    const limitTokens = runLimitTokens([models.model, models.fastModel], (model) => this.prices.runTokens(model));
     const run = await this.runs.createRun({
       threadId: thread.id,
       ticket: Ticket.parse(`t_${randomBytes(32).toString("base64url")}`),
@@ -139,7 +142,9 @@ export class RunLauncher {
     let key: RunKeyRef | undefined;
     let dispatched: RunRecord;
     try {
-      const minted = await this.budget.mint(run.id, { usd: limitUsd, tokens: limitTokens }, config.timeoutMinutes + KEY_GRACE_MINUTES, [run.model, run.fastModel ?? run.model], upstream);
+      const allowed = keyModels(run);
+      const limitTokens = runLimitTokens(allowed, (model) => this.prices.runTokens(model));
+      const minted = await this.budget.mint(run.id, { usd: limitUsd, tokens: limitTokens }, config.timeoutMinutes + KEY_GRACE_MINUTES, allowed, upstream);
       key = minted;
       await this.keys.recordUse(payer.userId, run.id, upstream.endpointId, upstream.last4);
       await this.runs.attachKey(run.id, minted);
@@ -203,10 +208,7 @@ export class RunLauncher {
       return undefined;
     };
 
-    if (conclusion !== "success") {
-      const exhausted = await this.exhaustedTokens(run);
-      return fail(exhausted === undefined ? `the run ended with "${conclusion ?? "unknown"}"` : `the run ended with "${conclusion ?? "unknown"}": ${tokenBudgetExhausted(exhausted)}`);
-    }
+    if (conclusion !== "success") return fail(await this.namingExhaustedTokens(run, `the run ended with "${conclusion ?? "unknown"}"`));
     if (config === undefined) return fail("the repository is no longer in the trusted configuration");
 
     let artifact;
@@ -268,7 +270,7 @@ export class RunLauncher {
     const observedMicros: UsdMicros = key === undefined ? 0 : await this.budget.usage(key, since);
     const decision = decideSettlement({
       redeemed: run.redeemedAt !== null,
-      free: [run.model, run.fastModel ?? run.model].every((model) => this.prices.isFree(model)),
+      allModelsFree: keyModels(run).every((model) => this.prices.isFree(model)),
       observedMicros,
       previousMicros,
       sinceFinishMs: now.getTime() - (run.finishedAt ?? run.createdAt).getTime(),
@@ -297,20 +299,18 @@ export class RunLauncher {
   }
 
   /** The watchdog's words for a run that outlived its timeout: an exhausted token budget names itself. */
-  async timeoutReason(run: RunRecord): Promise<string> {
-    const exhausted = await this.exhaustedTokens(run);
-    return exhausted === undefined ? "the run timed out" : `the run timed out: ${tokenBudgetExhausted(exhausted)}`;
+  timeoutReason(run: RunRecord): Promise<string> {
+    return this.namingExhaustedTokens(run, "the run timed out");
   }
 
   /**
-   * A failed run's token counter, when its key had a cap and reached it. Bifrost refuses requests
-   * over the cap with 429, so a run that died of it says so instead of a bare conclusion.
+   * `reason`, and the token budget when the run's key reached its cap: Bifrost refuses requests
+   * over it with 429, so a run that died of it says so instead of a bare conclusion.
    */
-  private async exhaustedTokens(run: RunRecord): Promise<TokenUsage | undefined> {
+  private async namingExhaustedTokens(run: RunRecord, reason: string): Promise<string> {
     const key = keyOf(run);
-    if (key === undefined) return undefined;
-    const usage = await this.budget.tokenUsage(key);
-    return usage !== undefined && usage.used >= usage.limit ? usage : undefined;
+    const exhausted = key === undefined ? undefined : tokenBudgetExhausted(await this.budget.tokenUsage(key));
+    return exhausted === undefined ? reason : `${reason}: ${exhausted}`;
   }
 
   /** Who pays for the run, or why it doesn't start now. */

@@ -78,10 +78,12 @@ describe.skipIf(env === undefined || user === undefined)("Bifrost run keys over 
 
       // Outside the key's allowlist: Bifrost can't route it for this key (400) or refuses it (403).
       expect([400, 403]).toContain((await message(key.key, "claude-sonnet-4-6")).status);
-      await expect(budget.mint(`${runId}-unpriced`, { usd: 0.05 }, 10, ["claude-sonnet-4-6"], { endpointId, ...user })).rejects.toThrow(/no price for claude-sonnet-4-6/);
+      await expect(budget.mint(`${runId}-unpriced`, { usd: 0.05 }, 10, ["claude-sonnet-4-6"], { endpointId, ...user })).rejects.toThrow(/no price or free mark for claude-sonnet-4-6/);
 
       await budget.freeze(key);
       expect((await message(key.key, "claude-haiku-4-5")).status).toBe(403);
+      // A paid key has no token cap: a failure on it must not claim an exhausted token budget.
+      expect(await budget.tokenUsage(key)).toBeUndefined();
       // The user's key left Bifrost; settlement still reads the frozen key's spend.
       expect(await keys.sweepUpstreamKeys(`${RUN_KEY_PREFIX}${runId}`, new Set([`${RUN_KEY_PREFIX}${runId}-other`]))).toEqual([]);
       expect(await budget.usage(key, new Date())).toBe(spent);
@@ -110,6 +112,9 @@ describe.skipIf(env === undefined || user === undefined)("Bifrost run keys over 
       }
       expect(statuses[0], "the first request is counted after it is served").toBe(200);
       expect(statuses, "a request over the cap is refused").toContain(429);
+      // What names the exhausted budget in the thread, read once spending stopped, as completion does.
+      await budget.freeze(key);
+      expect(await budget.tokenUsage(key)).toMatchObject({ limit: 50 });
     } finally {
       await budget.revoke(key);
     }

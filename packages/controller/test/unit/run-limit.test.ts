@@ -38,7 +38,13 @@ describe("runLimitTokens", () => {
 });
 
 describe("tokenBudgetExhausted", () => {
-  it("names the budget and its size for the thread", () => {
+  it("names the budget and its size for the thread once the key reached its cap", () => {
     expect(tokenBudgetExhausted({ used: 50_000_123, limit: 50_000_000 })).toBe("its token budget was exhausted (50000123 of 50000000 tokens)");
+    expect(tokenBudgetExhausted({ used: 50_000_000, limit: 50_000_000 })).toBe("its token budget was exhausted (50000000 of 50000000 tokens)");
+  });
+
+  it("leaves the conclusion alone for a key under its cap, or without one", () => {
+    expect(tokenBudgetExhausted({ used: 49_999_999, limit: 50_000_000 })).toBeUndefined();
+    expect(tokenBudgetExhausted(undefined)).toBeUndefined();
   });
 });

@@ -23,7 +23,7 @@ class RecordingKeys extends RunKeys {
     return Promise.resolve();
   }
 
-  unpriced(models: readonly string[]): Promise<string[]> {
+  unbillable(models: readonly string[]): Promise<string[]> {
     return Promise.resolve(models.filter((model) => !this.priced.has(model)));
   }
 
@@ -130,7 +130,7 @@ describe("BudgetService", () => {
   });
 
   it("refuses to start when the gateway can't price a configured model", async () => {
-    await expect(setup(["model-a", "claude-sonnet-4-6"]).budget.onApplicationBootstrap()).rejects.toThrow(/no price for configured models: claude-sonnet-4-6/);
+    await expect(setup(["model-a", "claude-sonnet-4-6"]).budget.onApplicationBootstrap()).rejects.toThrow(/no price or free mark for configured models: claude-sonnet-4-6/);
     await expect(setup(["model-a", "model-b"]).budget.onApplicationBootstrap()).resolves.toBeUndefined();
   });
 

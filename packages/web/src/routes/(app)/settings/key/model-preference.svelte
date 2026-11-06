@@ -19,6 +19,10 @@
   // Blank means the configuration's choice.
   let model = $state(start.model);
   let fastModel = $state(start.fastModel);
+
+  function label(option: string): string {
+    return models.free.includes(option) ? `${option} (free, capped by tokens)` : option;
+  }
 </script>
 
 <Card.Root>
@@ -42,7 +46,7 @@
           <NativeSelect.Root id="model-default" {...fields.model.as("select")} bind:value={model}>
             <NativeSelect.Option value="">The configuration's default</NativeSelect.Option>
             {#each models.models as option (option)}
-              <NativeSelect.Option value={option}>{models.free.includes(option) ? `${option} (free, capped by tokens)` : option}</NativeSelect.Option>
+              <NativeSelect.Option value={option}>{label(option)}</NativeSelect.Option>
             {/each}
           </NativeSelect.Root>
           <Field.Error errors={fields.model.issues()} />
@@ -52,7 +56,7 @@
           <NativeSelect.Root id="model-fast" {...fields.fastModel.as("select")} bind:value={fastModel}>
             <NativeSelect.Option value="">The configuration's fast model</NativeSelect.Option>
             {#each models.models as option (option)}
-              <NativeSelect.Option value={option}>{models.free.includes(option) ? `${option} (free, capped by tokens)` : option}</NativeSelect.Option>
+              <NativeSelect.Option value={option}>{label(option)}</NativeSelect.Option>
             {/each}
           </NativeSelect.Root>
           <Field.Description>For quick chores: titles, summaries. The run's model when the configuration has none set apart.</Field.Description>

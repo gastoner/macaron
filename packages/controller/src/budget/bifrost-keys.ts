@@ -3,19 +3,14 @@ import { z } from "zod";
 import { UpstreamError } from "../common/errors.ts";
 import type { BifrostEnv } from "../config/env.ts";
 import type { AddProviderRequest, CreatePricingOverrideRequest, CreateVirtualKeyData, Key, UpdateVirtualKeyData } from "../generated/bifrost/types.gen.ts";
-import { zKey, zListPricingOverridesResponse, zProviderResponse, zVirtualKey } from "../generated/bifrost/zod.gen.ts";
+import { zKey, zListPricingOverridesResponse, zProviderResponse, zRateLimit, zVirtualKey } from "../generated/bifrost/zod.gen.ts";
 import type { PriceList, PricePatch } from "./price-list.ts";
 import { type KeyStatus, type ProvisionedKey, RunKeys, type RunLimits, type TokenUsage, type Upstream } from "./run-keys.ts";
 
 /** Only the fields we use: the rest of Bifrost's objects can change without breaking us. */
 const CreatedKey = z.object({ virtual_key: zVirtualKey.pick({ id: true, value: true }) });
 const KeyBudgets = z.object({ virtual_key: zVirtualKey.pick({ budgets: true }) });
-/** Only the token counter of a key's rate limit: the rest of Bifrost's object can change freely. */
-const KeyTokens = z.object({
-  virtual_key: z.object({
-    rate_limit: z.object({ token_max_limit: z.coerce.number().optional(), token_current_usage: z.coerce.number() }).optional(),
-  }),
-});
+const KeyTokens = z.object({ virtual_key: z.object({ rate_limit: zRateLimit.pick({ token_max_limit: true, token_current_usage: true }).optional() }) });
 const KeyBinding = z.object({ virtual_key: z.object({ name: z.string(), provider_configs: z.array(z.object({ provider: z.string() })).nullish() }) });
 const ListedKey = zVirtualKey.pick({ id: true, name: true, is_active: true, created_at: true });
 /** An empty page has `virtual_keys: null` (Go's nil slice), unlike the OpenAPI document says. */
@@ -79,15 +74,15 @@ export class BifrostKeys extends RunKeys {
     this.logger.log("Bifrost keys over users' endpoints");
   }
 
-  /** Models the pinned list doesn't price: Bifrost would charge them $0, so a budget wouldn't stop them. */
-  unpriced(models: readonly string[]): Promise<string[]> {
-    return Promise.resolve(this.prices.unpriced(models));
+  /** Models the pinned list neither prices nor marks free: Bifrost would charge them $0, and nothing would stop them. */
+  unbillable(models: readonly string[]): Promise<string[]> {
+    return Promise.resolve(this.prices.unbillable(models));
   }
 
   async create(name: string, limits: RunLimits, expiresAt: Date, models: readonly string[], upstream: Upstream): Promise<ProvisionedKey> {
     const allowed = [...new Set(models)];
-    const unpriced = this.prices.unpriced(allowed);
-    if (unpriced.length > 0) throw new UpstreamError("bifrost", `no price for ${unpriced.join(", ")}: refusing a key its budget can't limit`, undefined);
+    const unbillable = this.prices.unbillable(allowed);
+    if (unbillable.length > 0) throw new UpstreamError("bifrost", `no price or free mark for ${unbillable.join(", ")}: refusing a key nothing would limit`, undefined);
 
     const provider = `${ENDPOINT_PROVIDER_PREFIX}${upstream.endpointId}`;
     await this.ensureProvider(provider, upstream.baseUrl);
@@ -190,7 +185,9 @@ export class BifrostKeys extends RunKeys {
     try {
       const key = await this.request("read key tokens", "GET", `/api/governance/virtual-keys/${encodeURIComponent(hash)}?from_memory=true`, KeyTokens);
       const rate = key.virtual_key.rate_limit;
-      return rate?.token_max_limit === undefined ? undefined : { used: rate.token_current_usage, limit: rate.token_max_limit };
+      // Bifrost omits an unset cap; a zero one would make every key look exhausted.
+      if (rate?.token_max_limit === undefined || rate.token_max_limit <= 0n) return undefined;
+      return { used: Number(rate.token_current_usage), limit: Number(rate.token_max_limit) };
     } catch (error: unknown) {
       // Settlement deletes a key once its cost is final: a completion arriving after that (a
       // delivery can lag by minutes) still names the generic failure.

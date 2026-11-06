@@ -84,8 +84,8 @@ export class CoreModule {}
         // A reloaded configuration naming a model the gateway can't bill is refused as a whole,
         // as at boot, rather than failing every run that would use it.
         config.addCheck(async (snapshot) => {
-          const unpriced = await keys.unpriced(configuredModels(snapshot));
-          return unpriced.length === 0 ? [] : [`the LLM gateway has no price for ${unpriced.join(", ")}`];
+          const unbillable = await keys.unbillable(configuredModels(snapshot));
+          return unbillable.length === 0 ? [] : [`the LLM gateway has no price or free mark for ${unbillable.join(", ")}`];
         });
         return keys;
       },

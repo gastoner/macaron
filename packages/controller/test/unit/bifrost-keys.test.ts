@@ -63,7 +63,15 @@ function virtualKey(id: string) {
     created_at: at,
     updated_at: at,
     budgets: [{ id: "b-1", max_limit: 0.5, reset_duration: "1Y", last_reset: at, current_usage: vk.usage, config_hash: null, created_at: at, updated_at: at }],
-    ...(vk.tokens === undefined ? {} : { rate_limit: { token_max_limit: vk.tokens.limit, token_current_usage: vk.tokens.used } }),
+    // Every run key has a rate limit (its requests per minute); Bifrost omits an unset token cap.
+    rate_limit: {
+      id: "rl-1",
+      request_max_limit: 60,
+      request_reset_duration: "1m",
+      request_current_usage: 0,
+      token_current_usage: vk.tokens?.used ?? 0,
+      ...(vk.tokens?.limit === undefined ? {} : { token_max_limit: vk.tokens.limit, token_reset_duration: "1Y" }),
+    },
   };
 }
 
@@ -168,10 +176,12 @@ describe("BifrostKeys.tokenUsage", () => {
     expect(await keys().tokenUsage("vk-1")).toEqual({ used: 2_000_001, limit: 2_000_000 });
   });
 
-  it("says nothing of a key without a token cap, or one settlement already deleted", async () => {
+  it("says nothing of a key without a token cap, with a zero one, or one settlement already deleted", async () => {
     bifrost.virtualKeys.set("vk-2", { name: "macaron-run-r10", active: true, provider: PROVIDER, keyIds: [], usage: 0, tokens: undefined });
+    bifrost.virtualKeys.set("vk-3", { name: "macaron-run-r11", active: true, provider: PROVIDER, keyIds: [], usage: 0, tokens: { used: 0, limit: 0 } });
 
     expect(await keys().tokenUsage("vk-2")).toBeUndefined();
+    expect(await keys().tokenUsage("vk-3")).toBeUndefined();
     expect(await keys().tokenUsage("vk-gone")).toBeUndefined();
   });
 });
@@ -232,7 +242,7 @@ describe("BifrostKeys.create", () => {
   });
 
   it("refuses a model without a pinned price before calling Bifrost", async () => {
-    await expect(keys().create("macaron-run-r4", { usd: 0.5 }, expires, ["claude-haiku-4-5", "vendor/unpriced"], upstream)).rejects.toThrow(/no price for vendor\/unpriced/);
+    await expect(keys().create("macaron-run-r4", { usd: 0.5 }, expires, ["claude-haiku-4-5", "vendor/unpriced"], upstream)).rejects.toThrow(/no price or free mark for vendor\/unpriced/);
     expect(bifrost.calls).toEqual([]);
   });
 

@@ -14,8 +14,11 @@ interface PinnedModel {
   readonly maxRunTokens: number | undefined;
 }
 
+/** A free model on purpose: priced 0 for both directions, with the ceiling its runs get. */
 const FreeMark = z.object({
   free: z.literal(true),
+  input_cost_per_token: z.literal(0),
+  output_cost_per_token: z.literal(0),
   max_run_tokens: z.int().positive().max(MAX_RUN_TOKENS),
 });
 
@@ -39,7 +42,7 @@ export class PriceList {
       for (const [field, value] of Object.entries(entry)) {
         if (fields.has(field) && typeof value === "number" && Number.isFinite(value) && value >= 0) patch[field] = value;
       }
-      models.set(model, { patch, maxRunTokens: freeMark(model, patch, entry) });
+      models.set(model, { patch, maxRunTokens: freeMark(model, entry) });
     }
     return new PriceList(models);
   }
@@ -67,8 +70,8 @@ export class PriceList {
     return this.runTokens(model) !== undefined;
   }
 
-  /** The models a run can use, by name: priced, or free and capped by tokens (despite the name). */
-  priced(): string[] {
+  /** The models a run can use, by name: priced, or free and capped by tokens. */
+  billable(): string[] {
     return [...this.models.keys()].filter((model) => this.patch(model) !== undefined).sort();
   }
 
@@ -77,8 +80,8 @@ export class PriceList {
     return [...this.models.keys()].filter((model) => this.isFree(model)).sort();
   }
 
-  /** The models among `models` a run can't use: neither priced nor free (a free one counts as billable). */
-  unpriced(models: readonly string[]): string[] {
+  /** The models among `models` a run can't use: neither priced nor marked free. */
+  unbillable(models: readonly string[]): string[] {
     return [...new Set(models)].filter((model) => this.patch(model) === undefined);
   }
 }
@@ -88,13 +91,9 @@ function isPriced(patch: PricePatch): boolean {
 }
 
 /** A free model's token ceiling; a mark on a priced model, or one without a ceiling, is a mistake. */
-function freeMark(model: string, patch: PricePatch, entry: Readonly<Record<string, unknown>>): number | undefined {
-  if (entry["free"] !== true) return undefined;
-  const input = patch["input_cost_per_token"];
-  const output = patch["output_cost_per_token"];
-  if ((input ?? 0) > 0 || (output ?? 0) > 0) throw new Error(`${model} is marked free but has a price: a free model is priced 0 and capped by tokens`);
-  if (input !== 0 || output !== 0) throw new Error(`${model} is marked free without input_cost_per_token and output_cost_per_token set to 0`);
-  const mark = FreeMark.safeParse({ free: entry["free"], max_run_tokens: entry["max_run_tokens"] });
-  if (!mark.success) throw new Error(`${model} is marked free without a valid max_run_tokens (1…${String(MAX_RUN_TOKENS)})`);
+function freeMark(model: string, entry: Readonly<Record<string, unknown>>): number | undefined {
+  if (!Object.hasOwn(entry, "free")) return undefined;
+  const mark = FreeMark.safeParse(entry);
+  if (!mark.success) throw new Error(`${model} has an invalid free mark (prices 0, max_run_tokens 1…${String(MAX_RUN_TOKENS)}): ${z.prettifyError(mark.error)}`);
   return mark.data.max_run_tokens;
 }

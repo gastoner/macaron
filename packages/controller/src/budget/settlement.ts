@@ -9,7 +9,7 @@ export interface SettlementInput {
   /** Did the run ever receive its key? A key that never left the controller spent nothing. */
   readonly redeemed: boolean;
   /** Every model the run's key allows is free: nothing will ever be billed, so no reading will come. */
-  readonly free: boolean;
+  readonly allModelsFree: boolean;
   /** Usage Bifrost reports for the key right now. */
   readonly observedMicros: UsdMicros;
   /** The reading from the previous attempt, a recheck interval ago. */
@@ -30,7 +30,7 @@ export type SettlementDecision =
  */
 export function decideSettlement(input: SettlementInput): SettlementDecision {
   if (!input.redeemed) return { kind: "settle", costMicros: 0 };
-  if (input.free) return { kind: "settle", costMicros: 0 };
+  if (input.allModelsFree) return { kind: "settle", costMicros: 0 };
   if (input.sinceFinishMs >= SETTLE_MAX_WAIT_MS) return { kind: "settle", costMicros: input.observedMicros };
   if (input.observedMicros > 0 && input.observedMicros === input.previousMicros) {
     return { kind: "settle", costMicros: input.observedMicros };

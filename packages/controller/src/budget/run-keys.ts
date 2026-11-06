@@ -45,8 +45,8 @@ export abstract class RunKeys {
   abstract init(): Promise<void>;
   /** A key capped at `limits`, refused after `expiresAt`, usable only with `models`, over `upstream`'s key. */
   abstract create(name: string, limits: RunLimits, expiresAt: Date, models: readonly string[], upstream: Upstream): Promise<ProvisionedKey>;
-  /** The models among `models` that can't be billed, so a key's budget wouldn't limit them. */
-  abstract unpriced(models: readonly string[]): Promise<string[]>;
+  /** The models among `models` that can't be billed (neither priced nor marked free): nothing would limit a key on them. */
+  abstract unbillable(models: readonly string[]): Promise<string[]>;
   /** Immediate: the next request made with the key is refused. */
   abstract disable(hash: string): Promise<void>;
   /** Idempotent: deleting a key that is already gone is not an error. */
